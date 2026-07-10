@@ -1,0 +1,4 @@
+-- Atualizacao V6
+-- Esta versao nao precisa alterar a estrutura do banco.
+-- A coluna dias_previstos ja foi criada na V4.
+-- O botao de excluir servico usa a tabela servicos existente.
