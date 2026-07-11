@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import type { ElementType, FormEvent, ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BarChart3,
   BookOpen,
@@ -50,6 +51,19 @@ const tabs: { id: Tab; label: string; icon: ElementType }[] = [
   { id: "cronograma", label: "Cronograma Físico", icon: CalendarDays },
   { id: "equipe", label: "Equipe", icon: Users },
 ];
+
+
+const rotas: Record<Tab, string> = {
+  dashboard: "/dashboard",
+  obras: "/obras",
+  servicos: "/servicos",
+  diarios: "/diario",
+  resumo_diarios: "/dashboard",
+  cronograma: "/cronograma",
+  equipe: "/equipe",
+  materiais: "/materiais",
+  relatorios: "/relatorios",
+};
 
 function campo(form: HTMLFormElement, nome: string) {
   return String(new FormData(form).get(nome) || "").trim();
@@ -161,8 +175,8 @@ function calcularHorasTrabalhadas(inicio: string | null, termino: string | null)
   return diferenca > 0 ? diferenca / 60 : 8;
 }
 
-export default function ControleObraApp() {
-  const [active, setActive] = useState<Tab>("dashboard");
+export default function ControleObraApp({ paginaInicial = "dashboard" }: { paginaInicial?: Tab } = {}) {
+  const [active, setActive] = useState<Tab>(paginaInicial);
   const [data, setData] = useState<AppData>(dadosVazios);
   const [selectedObraId, setSelectedObraId] = useState("");
   const [carregando, setCarregando] = useState(true);
@@ -184,6 +198,13 @@ export default function ControleObraApp() {
   const [servicoProducaoId, setServicoProducaoId] = useState("");
   const [servicoEditando, setServicoEditando] = useState<Servico | null>(null);
   const [obraEditando, setObraEditando] = useState<Obra | null>(null);
+  const [mostrarNovoDiario, setMostrarNovoDiario] = useState(false);
+  const [mostrarProdutividade, setMostrarProdutividade] = useState(false);
+  const [mostrarDiariosLancados, setMostrarDiariosLancados] = useState(false);
+
+  useEffect(() => {
+    setActive(paginaInicial);
+  }, [paginaInicial]);
 
   const obraSelecionada = data.obras.find((obra) => obra.id === selectedObraId) || data.obras[0];
   const obraId = obraSelecionada?.id || "";
@@ -399,6 +420,11 @@ export default function ControleObraApp() {
     });
   }, [obraSelecionada?.data_inicio, servicosObra, avancos]);
 
+  const avancosOrdenadosCronograma = useMemo(() => {
+    const ordem = new Map(cronogramaFisico.map((item, index) => [item.servico.id, index]));
+    return [...avancos].sort((a, b) => (ordem.get(a.servico.id) ?? 9999) - (ordem.get(b.servico.id) ?? 9999));
+  }, [avancos, cronogramaFisico]);
+
   const servicoPrevistoDiario = useMemo(() => {
     const dataAlvo = dataMeioDia(dataDiarioSelecionada || hojeISO());
     const servicosNaData = cronogramaFisico.filter((item) => {
@@ -485,10 +511,9 @@ export default function ControleObraApp() {
   }, [producoesObra]);
 
   const diasTotalPrevistoObra = useMemo(() => {
-    if (obraSelecionada?.prazo_dias && obraSelecionada.prazo_dias > 0) return obraSelecionada.prazo_dias;
     if (!cronogramaFisico.length) return 0;
     return Math.max(...cronogramaFisico.map((item) => item.fimOffset + 1), 0);
-  }, [obraSelecionada?.prazo_dias, cronogramaFisico]);
+  }, [cronogramaFisico]);
 
   const diasUteisPrevistosObra = useMemo(() => {
     if (!obraSelecionada?.data_inicio || diasTotalPrevistoObra <= 0) return 0;
@@ -940,6 +965,45 @@ export default function ControleObraApp() {
       }
     }
 
+    const inputFotos = form.elements.namedItem("fotos_diario") as HTMLInputElement | null;
+    const arquivosFotos = Array.from(inputFotos?.files || []);
+    const descricaoFotos = campo(form, "descricao_fotos") || null;
+
+    if (arquivosFotos.length > 0) {
+      const registrosFotos: FotoDiario[] = [];
+
+      for (const arquivo of arquivosFotos) {
+        const formData = new FormData();
+        formData.append("foto", arquivo);
+        formData.append("diario_id", item.id);
+        formData.append("obra_id", obraId);
+        if (descricaoFotos) formData.append("descricao", descricaoFotos);
+
+        const resposta = await fetch("/api/google-drive-upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        const json = await resposta.json().catch(() => ({}));
+        if (!resposta.ok || json.error) {
+          throw new Error(json.error || "Nao foi possivel enviar a foto para o Google Drive.");
+        }
+
+        registrosFotos.push({
+          id: uuid(),
+          diario_id: item.id,
+          url: json.viewUrl || json.url || json.thumbnailUrl,
+          descricao: descricaoFotos || arquivo.name,
+        });
+      }
+
+      const { error: erroFotos } = await supabase.from("fotos_diario").insert(registrosFotos as any);
+      if (erroFotos) {
+        setMensagem(erroFotos.message);
+        return;
+      }
+    }
+
     await carregarRemoto();
     form.reset();
     setDataDiarioSelecionada(hojeISO());
@@ -949,6 +1013,7 @@ export default function ControleObraApp() {
     setMotivoSemTrabalho("");
     setEquipePresenteModo("completa");
     setEquipeIncompletaTexto("");
+    setMostrarNovoDiario(false);
     setMensagem(producaoItem ? "Diário de obra e produção salvos com sucesso." : "Diário sem trabalho salvo com sucesso.");
   }
 
@@ -1358,7 +1423,7 @@ export default function ControleObraApp() {
         <div className="w-full max-w-md">
           <div className="mb-6 text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-700">Thebalde Camargo</p>
-            <h1 className="mt-2 text-3xl font-black text-slate-950">Controle de Obra V32</h1>
+            <h1 className="mt-2 text-3xl font-black text-slate-950">Controle de Obra V44</h1>
             <p className="mt-2 text-sm text-slate-500">Acesso aberto.</p>
           </div>
 
@@ -1398,13 +1463,96 @@ export default function ControleObraApp() {
     );
   }
 
+  if (active === "cronograma" && obraSelecionada) {
+    const statusPrazo = avancoGeral + 5 < previstoGeral ? "Atrasado" : avancoGeral > previstoGeral + 5 ? "Adiantado" : "No prazo";
+
+    return (
+      <main className="h-screen overflow-hidden bg-slate-100 p-3">
+        <div className="flex h-full min-h-0 flex-col gap-3">
+          <header className="no-print shrink-0 rounded-[28px] border border-slate-700 bg-slate-900 px-4 py-3 text-white shadow-soft">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+              <div>
+                <h1 className="text-2xl font-black leading-tight">Cronograma Físico</h1>
+                <p className="mt-1 text-xs font-semibold text-slate-200">Planejamento, previsto, executado e evolução da obra.</p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {data.obras.length > 0 && (
+                  <select
+                    className="rounded-2xl border border-white/20 bg-white/10 px-3 py-2 text-sm font-bold text-white shadow-sm"
+                    value={obraId}
+                    onChange={(event) => setSelectedObraId(event.target.value)}
+                  >
+                    {data.obras.map((obra) => (
+                      <option key={obra.id} value={obra.id} className="text-slate-900">{obra.nome}</option>
+                    ))}
+                  </select>
+                )}
+
+                <Link href="/dashboard" className="rounded-2xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-bold text-white hover:bg-white/20">Dashboard</Link>
+                <Link href="/obras" className="rounded-2xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-bold text-white hover:bg-white/20">Obras</Link>
+                <Link href="/servicos" className="rounded-2xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-bold text-white hover:bg-white/20">Serviços</Link>
+                <Link href="/diario" className="rounded-2xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-bold text-white hover:bg-white/20">Diário de Obra</Link>
+                <Link href="/equipe" className="rounded-2xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-bold text-white hover:bg-white/20">Equipe</Link>
+                <button
+                  type="button"
+                  onClick={gerarPdfCronogramaA1}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-2 text-sm font-black text-slate-950 hover:bg-white"
+                >
+                  <FileDown size={16} /> Gerar PDF A1
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+            <div className="grid gap-3 pb-4">
+          {mensagem && (
+            <div className="no-print flex items-center justify-between rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-cyan-900">
+              <span>{mensagem}</span>
+              <button onClick={() => setMensagem("")} className="font-bold">×</button>
+            </div>
+          )}
+
+          <section className="grid gap-2 md:grid-cols-3 xl:grid-cols-6">
+            <Kpi titulo="Previsto até hoje" valor={percentual(previstoGeral)} detalhe="Pelo prazo dos serviços" />
+            <Kpi titulo="Realizado" valor={percentual(avancoGeral)} detalhe="Pela produção lançada" />
+            <Kpi titulo="Diferença" valor={percentual(avancoGeral - previstoGeral)} detalhe="Realizado menos previsto" />
+            <Kpi titulo="Situação" valor={statusPrazo} detalhe="Comparativo físico" />
+            <Kpi titulo="Dias corridos previstos" valor={String(diasTotalPrevistoObra)} detalhe="Pelo cronograma físico" />
+            <Kpi titulo="Dias úteis previstos" valor={String(diasUteisPrevistosObra)} detalhe="Sem sábado e domingo" />
+          </section>
+
+          <section className="rounded-3xl border border-slate-200 bg-white p-3 shadow-soft">
+            <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-black text-slate-950">Gráfico do cronograma físico</h2>
+                <p className="text-xs text-slate-500">A parte superior fica fixa. Use a barra acima do cabeçalho Serviço para rolar os dias do gráfico.</p>
+              </div>
+            </div>
+
+            {!obraSelecionada.data_inicio && (
+              <p className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Cadastre a data de início da obra para calcular o gráfico do cronograma.</p>
+            )}
+
+            <div className="w-full">
+              <GraficoCronograma cronograma={cronogramaFisico} dataInicioObra={obraSelecionada.data_inicio} producoes={producoesObra} diarios={diariosObra} prazoStatus={statusPrazo === "Atrasado" ? "Fora do prazo" : statusPrazo} />
+            </div>
+          </section>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-slate-50">
       <header className="no-print border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-700">Thebalde Camargo</p>
-            <h1 className="text-2xl font-bold text-slate-950">Controle de Produção e Diário de Obra V32</h1>
+            <h1 className="text-2xl font-bold text-slate-950">Controle de Produção e Diário de Obra V44</h1>
             <p className="text-sm text-slate-500">Obras, diário, produção integrada, cronograma físico, produtividade, fotos no Google Drive e equipe.</p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -1432,21 +1580,21 @@ export default function ControleObraApp() {
             {tabs.map((tab) => {
               const Icon = tab.icon;
               return (
-                <button
+                <Link
                   key={tab.id}
-                  onClick={() => setActive(tab.id)}
+                  href={rotas[tab.id]}
                   className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition ${
                     active === tab.id ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-100"
                   }`}
                 >
                   <Icon size={18} /> {tab.label}
-                </button>
+                </Link>
               );
             })}
           </nav>
         </aside>
 
-        <section className="min-w-0">
+        <section key={active} className="min-w-0">
           {mensagem && (
             <div className="no-print mb-4 flex items-center justify-between rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-cyan-900">
               <span>{mensagem}</span>
@@ -1464,8 +1612,8 @@ export default function ControleObraApp() {
             <div className="grid gap-5">
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
                 <Kpi titulo="Andamento da obra" valor={percentual(avancoGeral)} detalhe="Média física dos serviços" />
-                <Kpi titulo="Dias total previsto" valor={String(diasTotalPrevistoObra)} detalhe="Prazo total da obra" />
-                <Kpi titulo="Dias trabalhados previstos" valor={String(diasUteisPrevistosObra)} detalhe="Sem contar sábado e domingo" />
+                <Kpi titulo="Dias corridos previstos" valor={String(diasTotalPrevistoObra)} detalhe="Pelo cronograma físico" />
+                <Kpi titulo="Dias úteis previstos" valor={String(diasUteisPrevistosObra)} detalhe="Sem contar sábado e domingo" />
                 <Kpi titulo="Situação do prazo" valor={situacaoPrazoObra} detalhe="Comparativo previsto x realizado" />
                 <Kpi titulo="Dias em andamento" valor={String(diasEmAndamentoObra)} detalhe="Desde o início da obra" />
               </div>
@@ -1476,9 +1624,9 @@ export default function ControleObraApp() {
                     <p className="text-sm text-slate-600">Total de diários cadastrados: <b>{diariosObra.length}</b></p>
                     <p className="text-sm text-slate-500">Inclui dias trabalhados, dias sem trabalho, ocorrências e fotos vinculadas.</p>
                   </div>
-                  <button type="button" onClick={() => setActive("resumo_diarios")} className="btn-primary">
-                    <BookOpen size={16} /> Abrir resumo do diário
-                  </button>
+                  <Link href="/diario" className="btn-primary">
+                    <BookOpen size={16} /> Abrir diário de obra
+                  </Link>
                 </div>
               </Card>
 
@@ -1510,6 +1658,12 @@ export default function ControleObraApp() {
                     const semTrabalho = /sem trabalho/i.test(String(diario.equipe_resumo || "")) || /sem trabalho/i.test(String(diario.servicos_executados || ""));
                     const producoesDoDiario = producoesObra.filter((producao) => producao.diario_id === diario.id);
                     const fotos = fotosDoDiario(diario.id);
+                    const percentualObraDia = servicosObra.length
+                      ? soma(producoesDoDiario.map((producao) => {
+                          const qtdPrevista = quantidadePrevistaServico(producao.servico_id);
+                          return qtdPrevista > 0 ? ((producao.quantidade / qtdPrevista) * 100) / servicosObra.length : 0;
+                        }))
+                      : 0;
 
                     return (
                       <article key={diario.id} className={`rounded-2xl border p-4 ${semTrabalho ? "border-red-200 bg-red-50" : "border-slate-200 bg-white"}`}>
@@ -1532,7 +1686,10 @@ export default function ControleObraApp() {
 
                         {producoesDoDiario.length > 0 && (
                           <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                            <p className="mb-2 text-xs font-bold uppercase text-slate-500">Produção vinculada</p>
+                            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-xs font-bold uppercase text-slate-500">Produção vinculada</p>
+                              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">% da obra andada no dia: {percentual(percentualObraDia)}</span>
+                            </div>
                             <div className="grid gap-2">
                               {producoesDoDiario.map((producao) => {
                                 const qtdPrevistaServico = quantidadePrevistaServico(producao.servico_id);
@@ -1551,16 +1708,16 @@ export default function ControleObraApp() {
                         )}
 
                         {fotos.length > 0 && (
-                          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                            {fotos.map((foto) => (
-                              <a key={foto.id} href={foto.url} target="_blank" rel="noreferrer" className="group overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-                                <img src={imagemGoogleDrive(foto.url)} alt={foto.descricao || "Foto do diário"} className="h-32 w-full object-cover transition group-hover:scale-105" />
-                                <div className="flex items-center justify-between gap-2 p-2 text-xs text-slate-600">
-                                  <span className="line-clamp-1">{foto.descricao || "Foto do diário"}</span>
-                                  <ExternalLink size={14} />
-                                </div>
-                              </a>
-                            ))}
+                          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                            <p className="mb-2 text-xs font-bold uppercase text-slate-500">Fotos vinculadas</p>
+                            <div className="grid gap-2">
+                              {fotos.map((foto, index) => (
+                                <a key={foto.id} href={foto.url} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-cyan-700 hover:bg-cyan-50">
+                                  <span>{foto.descricao || `Foto ${index + 1}`}</span>
+                                  <span className="inline-flex items-center gap-1">Abrir foto <ExternalLink size={14} /></span>
+                                </a>
+                              ))}
+                            </div>
                           </div>
                         )}
                       </article>
@@ -1713,6 +1870,35 @@ export default function ControleObraApp() {
 
           {active === "diarios" && obraSelecionada && (
             <div className="grid gap-5">
+              <div className="no-print flex flex-wrap gap-3">
+                <button type="button" onClick={() => setMostrarNovoDiario(true)} className="btn-primary">
+                  <Plus size={16} /> Novo diário de obra
+                </button>
+                <button type="button" onClick={() => setMostrarDiariosLancados(true)} className="btn-secondary">
+                  <BookOpen size={16} /> Diários lançados
+                </button>
+                <button type="button" onClick={() => setMostrarProdutividade(true)} className="btn-secondary">
+                  <BarChart3 size={16} /> Produtividade da equipe
+                </button>
+              </div>
+
+              <Card titulo="Andamento dos serviços">
+                <TabelaAvanco avancos={avancosOrdenadosCronograma} />
+              </Card>
+
+
+
+              {mostrarNovoDiario && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+                  <div className="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-3xl bg-white shadow-2xl">
+                    <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
+                      <div>
+                        <h2 className="text-lg font-bold text-slate-950">Novo diário de obra</h2>
+                        <p className="text-sm text-slate-500">Preencha o diário, produção do dia e fotos opcionais. Clique em OK para confirmar.</p>
+                      </div>
+                      <button type="button" onClick={() => setMostrarNovoDiario(false)} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">×</button>
+                    </div>
+                    <div className="p-5">
               <Card titulo="Novo diário de obra">
                 <form onSubmit={salvarDiario} className="grid gap-4 md:grid-cols-2">
                   <Input
@@ -1764,7 +1950,7 @@ export default function ControleObraApp() {
                         />
                       </label>
                       <Input name="responsavel_lancamento" label="Responsável pelo lançamento" />
-                      <div className="flex items-end"><button className="btn-primary"><Save size={16} /> Salvar diário sem trabalho</button></div>
+                      <div className="flex items-end"><button className="btn-primary"><Save size={16} /> OK</button></div>
                     </div>
                   ) : (
                     <div key="diario-trabalhado" className="contents">
@@ -1842,17 +2028,40 @@ export default function ControleObraApp() {
 
                       <Textarea name="servicos_executados" label="Serviços executados" placeholder="Descreva o que foi executado no dia" />
                       <Textarea name="ocorrencias" label="Ocorrências" placeholder="Atrasos, problemas, acidentes, interferências..." />
+
+                      <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:col-span-2 md:grid-cols-2">
+                        <Input name="descricao_fotos" label="Descrição das fotos" placeholder="Ex.: Alvenaria, fundação, concretagem..." />
+                        <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                          Fotos do diário (opcional)
+                          <input name="fotos_diario" type="file" accept="image/*" multiple className="rounded-xl border border-slate-200 bg-white px-3 py-2 font-normal text-slate-800 shadow-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100" />
+                          <span className="text-xs font-normal text-slate-500">Pode selecionar várias fotos. Não é obrigatório.</span>
+                        </label>
+                      </div>
+
                       <Input name="responsavel_lancamento" label="Responsável pelo lançamento" />
-                      <div className="flex items-end"><button className="btn-primary"><Save size={16} /> Salvar diário</button></div>
+                      <div className="flex items-end"><button className="btn-primary"><Save size={16} /> OK</button></div>
                     </div>
                   )}
                 </form>
               </Card>
 
-              <Card titulo="Andamento dos serviços">
-                <TabelaAvanco avancos={avancos} />
-              </Card>
 
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {mostrarProdutividade && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+                  <div className="max-h-[90vh] w-full max-w-6xl overflow-auto rounded-3xl bg-white shadow-2xl">
+                    <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
+                      <div>
+                        <h2 className="text-lg font-bold text-slate-950">Produtividade da equipe</h2>
+                        <p className="text-sm text-slate-500">Alimentada pelos lançamentos feitos no Diário de Obra.</p>
+                      </div>
+                      <button type="button" onClick={() => setMostrarProdutividade(false)} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">×</button>
+                    </div>
+                    <div className="p-5">
               <Card titulo="Produtividade da equipe">
                 <div className="overflow-auto">
                   <table className="min-w-full text-left text-sm">
@@ -1898,22 +2107,36 @@ export default function ControleObraApp() {
                 </div>
               </Card>
 
-              <Card titulo="Adicionar fotos ao diário" subtitulo="Envie fotos da obra para o Google Drive e vincule ao diário de obra.">
-                <form onSubmit={salvarFotosDiario} className="grid gap-4 md:grid-cols-2">
-                  <SelectId name="diario_id" label="Diário" items={diariosObra.map((d) => ({ id: d.id, nome: `${dataBR(d.data)} - ${d.clima || "sem clima"}` }))} optionalLabel="Selecione o diário" />
-                  <Input name="descricao" label="Descrição das fotos" placeholder="Ex.: Alvenaria, fundação, concretagem..." />
-                  <label className="grid gap-1 text-sm font-semibold text-slate-700 md:col-span-2">
-                    Fotos
-                    <input name="fotos" type="file" accept="image/*" multiple className="rounded-xl border border-slate-200 bg-white px-3 py-2 font-normal text-slate-800 shadow-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100" />
-                    <span className="text-xs font-normal text-slate-500">Você pode selecionar várias fotos de uma vez.</span>
-                  </label>
-                  <div className="md:col-span-2"><button className="btn-primary"><UploadCloud size={16} /> Enviar fotos para o Drive</button></div>
-                </form>
-              </Card>
 
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {mostrarDiariosLancados && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+                  <div className="max-h-[90vh] w-full max-w-6xl overflow-auto rounded-3xl bg-white shadow-2xl">
+                    <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
+                      <div>
+                        <h2 className="text-lg font-bold text-slate-950">Diários lançados</h2>
+                        <p className="text-sm text-slate-500">Todos os diários de obra cadastrados.</p>
+                      </div>
+                      <button type="button" onClick={() => setMostrarDiariosLancados(false)} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">×</button>
+                    </div>
+                    <div className="p-5">
               <Card titulo="Diários lançados" subtitulo="Histórico da obra selecionada com fotos vinculadas.">
                 <div className="grid gap-3">
-                  {diariosObra.map((diario) => (
+                  {diariosObra.map((diario) => {
+                    const producoesDoDiario = producoesObra.filter((producao) => producao.diario_id === diario.id);
+                    const fotos = fotosDoDiario(diario.id);
+                    const percentualObraDia = servicosObra.length
+                      ? soma(producoesDoDiario.map((producao) => {
+                          const qtdPrevista = quantidadePrevistaServico(producao.servico_id);
+                          return qtdPrevista > 0 ? ((producao.quantidade / qtdPrevista) * 100) / servicosObra.length : 0;
+                        }))
+                      : 0;
+
+                    return (
                     <article key={diario.id} className="rounded-2xl border border-slate-200 bg-white p-4">
                       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
                         <div>
@@ -1937,24 +2160,59 @@ export default function ControleObraApp() {
                         <p><b>Serviços:</b> {diario.servicos_executados || "-"}</p>
                         <p><b>Ocorrências:</b> {diario.ocorrencias || "-"}</p>
                       </div>
-                      {fotosDoDiario(diario.id).length > 0 && (
-                        <div className="mt-4 grid gap-3 border-t border-slate-100 pt-3 sm:grid-cols-2 lg:grid-cols-3">
-                          {fotosDoDiario(diario.id).map((foto) => (
-                            <a key={foto.id} href={foto.url} target="_blank" rel="noreferrer" className="group overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-                              <img src={imagemGoogleDrive(foto.url)} alt={foto.descricao || "Foto do diario"} className="h-36 w-full object-cover transition group-hover:scale-105" />
-                              <div className="flex items-center justify-between gap-2 p-2 text-xs text-slate-600">
-                                <span className="line-clamp-1">{foto.descricao || "Foto do diario"}</span>
-                                <ExternalLink size={14} />
-                              </div>
-                            </a>
-                          ))}
+
+                      {producoesDoDiario.length > 0 && (
+                        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-xs font-bold uppercase text-slate-500">Produtividade do dia</p>
+                            <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">% da obra andada no dia: {percentual(percentualObraDia)}</span>
+                          </div>
+
+                          <div className="grid gap-2">
+                            {producoesDoDiario.map((producao) => {
+                              const qtdPrevistaServico = quantidadePrevistaServico(producao.servico_id);
+                              const percentualLancado = qtdPrevistaServico > 0 ? (producao.quantidade / qtdPrevistaServico) * 100 : 0;
+                              const hh = producao.pessoas * producao.horas;
+                              const produtividade = hh > 0 ? producao.quantidade / hh : 0;
+                              return (
+                                <div key={producao.id} className="grid gap-2 rounded-xl bg-white p-3 text-sm md:grid-cols-5">
+                                  <span><b>Serviço:</b> {nomeServico(producao.servico_id)}</span>
+                                  <span><b>% do serviço:</b> {percentual(percentualLancado)}</span>
+                                  <span><b>Qtd. feita:</b> {numero(producao.quantidade)} {unidadeServico(producao.servico_id)}</span>
+                                  <span><b>Equipe:</b> {producao.pessoas} pessoa(s) • {numero(producao.horas, 1)}h</span>
+                                  <span><b>Produtividade:</b> {numero(produtividade, 2)} {unidadeServico(producao.servico_id)}/hh</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {fotos.length > 0 && (
+                        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                          <p className="mb-2 text-xs font-bold uppercase text-slate-500">Fotos vinculadas</p>
+                          <div className="grid gap-2">
+                            {fotos.map((foto, index) => (
+                              <a key={foto.id} href={foto.url} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-cyan-700 hover:bg-cyan-50">
+                                <span>{foto.descricao || `Foto ${index + 1}`}</span>
+                                <span className="inline-flex items-center gap-1">Abrir foto <ExternalLink size={14} /></span>
+                              </a>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </article>
-                  ))}
+                    );
+                  })}
+
                   {diariosObra.length === 0 && <Empty text="Nenhum diário lançado ainda." />}
                 </div>
               </Card>
+
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -2321,6 +2579,9 @@ function GraficoCronograma({
   diarios: Diario[];
   prazoStatus: string;
 }) {
+  const barraTopoRef = useRef<HTMLDivElement | null>(null);
+  const graficoDiasRef = useRef<HTMLDivElement | null>(null);
+
   if (!cronograma.length || !dataInicioObra) {
     return <Empty text="Cadastre a data de início da obra e os serviços para gerar o gráfico." />;
   }
@@ -2349,110 +2610,154 @@ function GraficoCronograma({
   ).size;
   const andamentoAtual = cronograma.length ? soma(cronograma.map((item) => Math.min(item.avancoReal, 100))) / cronograma.length : 0;
 
+  const larguraDias = dias.length * 38;
+
+  function sincronizarTopo(scrollLeft: number) {
+    if (graficoDiasRef.current && graficoDiasRef.current.scrollLeft !== scrollLeft) {
+      graficoDiasRef.current.scrollLeft = scrollLeft;
+    }
+  }
+
+  function sincronizarDias(scrollLeft: number) {
+    if (barraTopoRef.current && barraTopoRef.current.scrollLeft !== scrollLeft) {
+      barraTopoRef.current.scrollLeft = scrollLeft;
+    }
+  }
+
   return (
-    <div className="w-full max-w-full overflow-x-auto overflow-y-auto rounded-2xl border border-slate-200 bg-white" style={{ maxHeight: "58vh" }}>
-      <div id="grafico-cronograma-pdf-conteudo" className="inline-block min-w-max bg-white">
-      <div className="border-b border-slate-200 bg-white px-4 py-4">
-        <div className="mb-3 flex items-center justify-between gap-4">
+    <div id="grafico-cronograma-pdf-conteudo" className="w-full overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <div className="border-b border-slate-200 bg-white px-3 py-2">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-lg font-bold text-slate-900">Cronograma físico da obra</div>
-            <div className="text-sm text-slate-500">Resumo de prazo para impressão em PDF A1</div>
+            <div className="text-base font-bold text-slate-900">Cronograma físico da obra</div>
+            <div className="text-xs text-slate-500">Resumo de prazo para impressão em PDF A1</div>
           </div>
-          <div className="text-right text-sm text-slate-600">
-            <div><span className="font-semibold">Início previsto:</span> {dataBR(dataInicioObra)}</div>
-            <div><span className="font-semibold">Término previsto:</span> {dataBR(paraISO(fimPrevistoData))}</div>
+          <div className="flex flex-wrap gap-3 text-xs text-slate-600">
+            <div><span className="font-semibold">Início:</span> {dataBR(dataInicioObra)}</div>
+            <div><span className="font-semibold">Término:</span> {dataBR(paraISO(fimPrevistoData))}</div>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-6">
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="text-xs uppercase text-slate-500">Dias total da obra previsto</div><div className="text-xl font-bold text-slate-900">{diasTotaisPrevistos}</div><div className="text-xs text-slate-500">Considerando sábados e domingos</div></div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="text-xs uppercase text-slate-500">Dias úteis previsto</div><div className="text-xl font-bold text-slate-900">{diasUteisPrevistos}</div><div className="text-xs text-slate-500">Sem contar sábados e domingos</div></div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="text-xs uppercase text-slate-500">Dias trabalhados</div><div className="text-xl font-bold text-slate-900">{diasTrabalhados}</div><div className="text-xs text-slate-500">Com diário lançado e trabalho</div></div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="text-xs uppercase text-slate-500">% de andamento</div><div className="text-xl font-bold text-slate-900">{percentual(andamentoAtual)}</div><div className="text-xs text-slate-500">Média física da obra</div></div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="text-xs uppercase text-slate-500">Situação do prazo</div><div className="text-xl font-bold text-slate-900">{prazoStatus}</div><div className="text-xs text-slate-500">Comparando previsto e realizado</div></div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="text-xs uppercase text-slate-500">Serviços</div><div className="text-xl font-bold text-slate-900">{cronograma.length}</div><div className="text-xs text-slate-500">Total de atividades no cronograma</div></div>
+
+        <div className="grid gap-2 md:grid-cols-3 xl:grid-cols-6">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"><div className="text-[10px] uppercase text-slate-500">Dias total previsto</div><div className="text-lg font-bold text-slate-900">{diasTotaisPrevistos}</div><div className="text-[10px] text-slate-500">Com sábados e domingos</div></div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"><div className="text-[10px] uppercase text-slate-500">Dias úteis previsto</div><div className="text-lg font-bold text-slate-900">{diasUteisPrevistos}</div><div className="text-[10px] text-slate-500">Sem sábados e domingos</div></div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"><div className="text-[10px] uppercase text-slate-500">Dias trabalhados</div><div className="text-lg font-bold text-slate-900">{diasTrabalhados}</div><div className="text-[10px] text-slate-500">Com diário trabalhado</div></div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"><div className="text-[10px] uppercase text-slate-500">% andamento</div><div className="text-lg font-bold text-slate-900">{percentual(andamentoAtual)}</div><div className="text-[10px] text-slate-500">Média física</div></div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"><div className="text-[10px] uppercase text-slate-500">Situação</div><div className="text-lg font-bold text-slate-900">{prazoStatus}</div><div className="text-[10px] text-slate-500">Previsto x realizado</div></div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"><div className="text-[10px] uppercase text-slate-500">Serviços</div><div className="text-lg font-bold text-slate-900">{cronograma.length}</div><div className="text-[10px] text-slate-500">Atividades</div></div>
+        </div>
+
+        <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-slate-600">
+          <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-5 rounded bg-orange-400" /> Previsto</span>
+          <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-5 rounded bg-lime-400" /> Executado</span>
+          <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-5 rounded bg-red-500" /> Dia sem trabalho</span>
+          <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-5 rounded bg-red-100 ring-1 ring-red-300" /> Sábado/domingo</span>
         </div>
       </div>
-      <table className="min-w-max border-collapse text-sm">
-        <thead className="sticky top-0 z-30">
-          <tr className="bg-slate-950 text-white">
-            <th className="sticky left-0 z-20 min-w-[300px] border border-slate-300 bg-slate-950 p-3 text-left">Serviço</th>
-            {dias.map((dia) => {
-              const fimSemana = ehFimDeSemana(dia.data);
-              return (
-                <th key={dia.indice} className={`min-w-[38px] border border-slate-300 px-1 py-2 text-center text-[11px] font-bold ${fimSemana ? "bg-red-700 text-white" : "bg-slate-950 text-white"}`}>
-                  {dia.numero}
-                </th>
-              );
-            })}
-          </tr>
-          <tr className="bg-cyan-50 text-slate-600">
-            <th className="sticky left-0 z-10 border border-slate-200 bg-cyan-50 p-2 text-left text-xs font-semibold">Dia da obra</th>
-            {dias.map((dia) => {
-              const fimSemana = ehFimDeSemana(dia.data);
-              return (
-                <th
-                  key={dia.indice}
-                  className={`border border-slate-200 px-1 py-1 text-center text-[10px] font-medium ${fimSemana ? "bg-red-100 text-red-700" : "bg-cyan-50"}`}
-                  title={`${dataBR(paraISO(dia.data))} - ${nomeDiaSemana(dia.data)}`}
-                >
-                  {String(dia.data.getDate()).padStart(2, "0")}
-                </th>
-              );
-            })}
-          </tr>
-        </thead>
-        <tbody>
-          {cronograma.map((item) => {
-            const inicioServico = dataMeioDia(item.inicioPrevisto);
-            const producoesDoServico = producoes.filter((producao) => producao.servico_id === item.servico.id);
-            const datasProduzidas = producoesDoServico.map((producao) => producao.data).sort();
-            const primeiraDataProducao = datasProduzidas[0] || "";
-            const ultimaDataProducao = datasProduzidas[datasProduzidas.length - 1] || "";
-            return (
-              <tr key={item.servico.id} className="odd:bg-white even:bg-slate-50">
-                <td className="sticky left-0 z-10 border border-slate-200 bg-inherit p-3 align-top">
-                  <div className="font-semibold text-slate-900">{item.servico.nome}</div>
-                  <div className="mt-1 text-xs text-slate-500">
-                    Prev.: {item.diasPrevistos} dia(s) • Exec.: {item.diasExecutados} dia(s) • Andamento: {percentual(item.avancoReal)}
-                  </div>
-                </td>
+
+      <div className="grid grid-cols-[300px_minmax(0,1fr)]">
+        <div className="z-20 bg-white shadow-[8px_0_10px_-10px_rgba(15,23,42,0.45)]">
+          <div className="h-7 border-b border-slate-200 bg-white" />
+          <div className="flex h-10 items-center border border-slate-300 bg-slate-950 px-3 text-left text-sm font-bold text-white">Serviço</div>
+          <div className="flex h-8 items-center border border-slate-200 bg-cyan-50 px-3 text-left text-xs font-semibold text-slate-600">Dia da obra</div>
+
+          {cronograma.map((item) => (
+            <div key={item.servico.id} className="h-[72px] border border-slate-200 bg-white px-3 py-3">
+              <div className="font-semibold text-slate-900">{item.servico.nome}</div>
+              <div className="mt-1 text-xs text-slate-500">
+                Prev.: {item.diasPrevistos} dia(s) • Exec.: {item.diasExecutados} dia(s) • Andamento: {percentual(item.avancoReal)}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="min-w-0 bg-white">
+          <div className="border-b border-slate-200 bg-white px-2 py-1">
+            <div
+              ref={barraTopoRef}
+              onScroll={(event) => sincronizarTopo(event.currentTarget.scrollLeft)}
+              className="h-5 overflow-x-auto overflow-y-hidden"
+              title="Role aqui para navegar pelos dias do cronograma"
+            >
+              <div style={{ width: `${larguraDias}px`, height: 1 }} />
+            </div>
+          </div>
+
+          <div
+            ref={graficoDiasRef}
+            onScroll={(event) => sincronizarDias(event.currentTarget.scrollLeft)}
+            className="overflow-x-auto overflow-y-visible bg-white"
+          >
+            <div style={{ width: `${larguraDias}px` }}>
+              <div className="grid h-10" style={{ gridTemplateColumns: `repeat(${dias.length}, 38px)` }}>
                 {dias.map((dia) => {
                   const fimSemana = ehFimDeSemana(dia.data);
-                  const dataDia = paraISO(dia.data);
-                  const motivoSemTrabalho = diariosSemTrabalho.get(dataDia);
-                  const dentroIntervalo = dia.indice >= item.inicioOffset && dia.indice <= item.fimOffset;
-                  const diaUtilDoServico = dentroIntervalo && !fimSemana && !motivoSemTrabalho;
-                  const ordemUtil = diaUtilDoServico ? contarDiasUteisInclusivo(inicioServico, dia.data) : 0;
-                  const percentualPrevistoDia = diaUtilDoServico ? Math.min((ordemUtil / item.diasPrevistos) * 100, 100) : 0;
-                  const quantidadeExecutadaAteDia = soma(producoesDoServico.filter((producao) => producao.data <= dataDia).map((producao) => producao.quantidade));
-                  const percentualExecutadoDia = item.servico.qtd_prevista > 0 ? Math.min((quantidadeExecutadaAteDia / item.servico.qtd_prevista) * 100, 100) : 0;
-                  const dentroExecutado = diaUtilDoServico && percentualExecutadoDia > 0 && dataDia >= primeiraDataProducao && dataDia <= ultimaDataProducao;
-                  const tituloSemTrabalho = motivoSemTrabalho ? `${dataBR(dataDia)} • sem trabalho: ${motivoSemTrabalho}` : "";
                   return (
-                    <td key={dia.indice} className={`h-16 min-w-[38px] border border-slate-200 px-0 py-0 align-top ${motivoSemTrabalho ? "bg-red-100" : fimSemana ? "bg-red-50" : "bg-white"}`}>
-                      <div className="grid h-full grid-rows-2">
-                        <div
-                          className={`${motivoSemTrabalho && dentroIntervalo ? "bg-red-500" : diaUtilDoServico ? "bg-orange-400" : "bg-transparent"}`}
-                          title={motivoSemTrabalho && dentroIntervalo ? tituloSemTrabalho : diaUtilDoServico ? `${item.servico.nome} • ${dataBR(dataDia)} • previsto acumulado: ${percentual(percentualPrevistoDia)}` : fimSemana ? `${dataBR(dataDia)} • sábado/domingo não contado` : ""}
-                        />
-                        <div
-                          className={`${motivoSemTrabalho && dentroIntervalo ? "bg-red-500" : dentroExecutado ? "bg-lime-400" : "bg-transparent"}`}
-                          title={motivoSemTrabalho && dentroIntervalo ? tituloSemTrabalho : dentroExecutado ? `${item.servico.nome} • ${dataBR(dataDia)} • executado acumulado: ${percentual(percentualExecutadoDia)}` : fimSemana ? `${dataBR(dataDia)} • sábado/domingo não contado` : ""}
-                        />
-                      </div>
-                    </td>
+                    <div key={dia.indice} className={`flex items-center justify-center border border-slate-300 px-1 text-center text-[11px] font-bold ${fimSemana ? "bg-red-700 text-white" : "bg-slate-950 text-white"}`}>
+                      {dia.numero}
+                    </div>
                   );
                 })}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      <div className="flex flex-wrap gap-4 border-t border-slate-200 bg-white px-4 py-3 text-xs text-slate-600">
-        <span className="inline-flex items-center gap-2"><span className="inline-block h-3 w-6 rounded bg-orange-400" /> Previsto</span>
-        <span className="inline-flex items-center gap-2"><span className="inline-block h-3 w-6 rounded bg-lime-400" /> Executado</span>
-        <span className="inline-flex items-center gap-2"><span className="inline-block h-3 w-6 rounded bg-red-500" /> Dia sem trabalho com motivo no diário</span><span className="inline-flex items-center gap-2"><span className="inline-block h-3 w-6 rounded bg-red-100 ring-1 ring-red-300" /> Sábado/domingo não entram na contagem</span>
-      </div>
+              </div>
+
+              <div className="grid h-8" style={{ gridTemplateColumns: `repeat(${dias.length}, 38px)` }}>
+                {dias.map((dia) => {
+                  const fimSemana = ehFimDeSemana(dia.data);
+                  return (
+                    <div
+                      key={dia.indice}
+                      className={`flex items-center justify-center border border-slate-200 px-1 text-center text-[10px] font-medium ${fimSemana ? "bg-red-100 text-red-700" : "bg-cyan-50 text-slate-600"}`}
+                      title={`${dataBR(paraISO(dia.data))} - ${nomeDiaSemana(dia.data)}`}
+                    >
+                      {String(dia.data.getDate()).padStart(2, "0")}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {cronograma.map((item) => {
+                const inicioServico = dataMeioDia(item.inicioPrevisto);
+                const producoesDoServico = producoes.filter((producao) => producao.servico_id === item.servico.id);
+                const datasProduzidas = producoesDoServico.map((producao) => producao.data).sort();
+                const primeiraDataProducao = datasProduzidas[0] || "";
+                const ultimaDataProducao = datasProduzidas[datasProduzidas.length - 1] || "";
+
+                return (
+                  <div key={item.servico.id} className="grid h-[72px]" style={{ gridTemplateColumns: `repeat(${dias.length}, 38px)` }}>
+                    {dias.map((dia) => {
+                      const fimSemana = ehFimDeSemana(dia.data);
+                      const dataDia = paraISO(dia.data);
+                      const motivoSemTrabalho = diariosSemTrabalho.get(dataDia);
+                      const dentroIntervalo = dia.indice >= item.inicioOffset && dia.indice <= item.fimOffset;
+                      const diaUtilDoServico = dentroIntervalo && !fimSemana && !motivoSemTrabalho;
+                      const ordemUtil = diaUtilDoServico ? contarDiasUteisInclusivo(inicioServico, dia.data) : 0;
+                      const percentualPrevistoDia = diaUtilDoServico ? Math.min((ordemUtil / item.diasPrevistos) * 100, 100) : 0;
+                      const quantidadeExecutadaAteDia = soma(producoesDoServico.filter((producao) => producao.data <= dataDia).map((producao) => producao.quantidade));
+                      const percentualExecutadoDia = item.servico.qtd_prevista > 0 ? Math.min((quantidadeExecutadaAteDia / item.servico.qtd_prevista) * 100, 100) : 0;
+                      const dentroExecutado = diaUtilDoServico && percentualExecutadoDia > 0 && dataDia >= primeiraDataProducao && dataDia <= ultimaDataProducao;
+                      const tituloSemTrabalho = motivoSemTrabalho ? `${dataBR(dataDia)} • sem trabalho: ${motivoSemTrabalho}` : "";
+
+                      return (
+                        <div key={dia.indice} className={`h-[72px] border border-slate-200 px-0 py-0 align-top ${motivoSemTrabalho ? "bg-red-100" : fimSemana ? "bg-red-50" : "bg-white"}`}>
+                          <div className="grid h-full grid-rows-2">
+                            <div
+                              className={`${motivoSemTrabalho && dentroIntervalo ? "bg-red-500" : diaUtilDoServico ? "bg-orange-400" : "bg-transparent"}`}
+                              title={motivoSemTrabalho && dentroIntervalo ? tituloSemTrabalho : diaUtilDoServico ? `${item.servico.nome} • ${dataBR(dataDia)} • previsto acumulado: ${percentual(percentualPrevistoDia)}` : fimSemana ? `${dataBR(dataDia)} • sábado/domingo não contado` : ""}
+                            />
+                            <div
+                              className={`${motivoSemTrabalho && dentroIntervalo ? "bg-red-500" : dentroExecutado ? "bg-lime-400" : "bg-transparent"}`}
+                              title={motivoSemTrabalho && dentroIntervalo ? tituloSemTrabalho : dentroExecutado ? `${item.servico.nome} • ${dataBR(dataDia)} • executado acumulado: ${percentual(percentualExecutadoDia)}` : fimSemana ? `${dataBR(dataDia)} • sábado/domingo não contado` : ""}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -2483,39 +2788,54 @@ function ResumoServicosCronograma({
   }
 
   return (
-    <div className={`grid gap-3 ${compacto ? "md:grid-cols-2 xl:grid-cols-3" : "md:grid-cols-2 xl:grid-cols-4"}`}>
-      {cronograma.map((item) => (
-        <article key={item.servico.id} className="rounded-2xl border border-slate-200 bg-white p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-bold uppercase text-slate-950">{item.servico.nome}</h3>
-              <p className="mt-1 text-xs text-slate-500">{item.servico.categoria || "Sem categoria"}</p>
-            </div>
-            <span className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-bold text-cyan-700">
-              {percentual(item.avancoReal)}
-            </span>
-          </div>
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <div className="hidden grid-cols-[2fr_1fr_1fr_0.8fr_0.8fr] gap-3 bg-slate-100 px-4 py-3 text-xs font-bold uppercase text-slate-500 md:grid">
+        <span>Serviço</span>
+        <span>Início previsto</span>
+        <span>Término previsto</span>
+        <span className="text-right">Andamento</span>
+        <span className="text-right">Situação</span>
+      </div>
 
-          <div className="mt-4 grid gap-2 text-sm text-slate-700">
-            <div className="flex justify-between gap-2">
-              <span className="text-slate-500">Início previsto</span>
-              <b>{dataBR(item.inicioPrevisto)}</b>
+      <div className="divide-y divide-slate-100">
+        {cronograma.map((item) => (
+          <article key={item.servico.id} className="grid gap-3 px-4 py-3 text-sm md:grid-cols-[2fr_1fr_1fr_0.8fr_0.8fr] md:items-center">
+            <div>
+              <div className="font-bold text-slate-950">{item.servico.nome}</div>
+              <div className="mt-1 text-xs text-slate-500">
+                {item.servico.categoria || "Sem categoria"} • {item.diasPrevistos} dia(s) previsto(s)
+              </div>
             </div>
-            <div className="flex justify-between gap-2">
-              <span className="text-slate-500">Término previsto</span>
-              <b>{dataBR(item.fimPrevisto)}</b>
+
+            <div>
+              <span className="text-xs font-semibold uppercase text-slate-400 md:hidden">Início previsto: </span>
+              <b className="text-slate-700">{dataBR(item.inicioPrevisto)}</b>
             </div>
-            <div className="flex justify-between gap-2">
-              <span className="text-slate-500">Dias previstos</span>
-              <b>{item.diasPrevistos}</b>
+
+            <div>
+              <span className="text-xs font-semibold uppercase text-slate-400 md:hidden">Término previsto: </span>
+              <b className="text-slate-700">{dataBR(item.fimPrevisto)}</b>
             </div>
-            <div className="flex justify-between gap-2">
-              <span className="text-slate-500">Situação</span>
-              <b>{item.situacao}</b>
+
+            <div className="md:text-right">
+              <span className="text-xs font-semibold uppercase text-slate-400 md:hidden">Andamento: </span>
+              <span className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-bold text-cyan-700">{percentual(item.avancoReal)}</span>
             </div>
-          </div>
-        </article>
-      ))}
+
+            <div className="md:text-right">
+              <span className={`rounded-full px-3 py-1 text-xs font-bold ${
+                item.situacao === "Atrasado"
+                  ? "bg-red-50 text-red-700"
+                  : item.situacao === "Adiantado"
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "bg-slate-100 text-slate-700"
+              }`}>
+                {item.situacao}
+              </span>
+            </div>
+          </article>
+        ))}
+      </div>
     </div>
   );
 }

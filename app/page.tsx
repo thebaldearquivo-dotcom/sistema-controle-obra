@@ -1,5 +1,5 @@
-import ControleObraApp from "@/components/ControleObraApp";
+import { redirect } from "next/navigation";
 
 export default function Home() {
-  return <ControleObraApp />;
+  redirect("/dashboard");
 }
