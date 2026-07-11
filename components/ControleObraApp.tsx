@@ -8,6 +8,7 @@ import {
   BookOpen,
   Building2,
   CalendarDays,
+  CheckCircle2,
   ClipboardList,
   FileText,
   FileDown,
@@ -201,6 +202,7 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
   const [mostrarNovoDiario, setMostrarNovoDiario] = useState(false);
   const [mostrarProdutividade, setMostrarProdutividade] = useState(false);
   const [mostrarDiariosLancados, setMostrarDiariosLancados] = useState(false);
+  const [mostrarServicosConcluidos, setMostrarServicosConcluidos] = useState(false);
 
   useEffect(() => {
     setActive(paginaInicial);
@@ -424,6 +426,14 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
     const ordem = new Map(cronogramaFisico.map((item, index) => [item.servico.id, index]));
     return [...avancos].sort((a, b) => (ordem.get(a.servico.id) ?? 9999) - (ordem.get(b.servico.id) ?? 9999));
   }, [avancos, cronogramaFisico]);
+
+  const servicosEmAndamentoDiario = useMemo(() => {
+    return avancosOrdenadosCronograma.filter((item) => item.avanco < 100);
+  }, [avancosOrdenadosCronograma]);
+
+  const servicosConcluidosDiario = useMemo(() => {
+    return avancosOrdenadosCronograma.filter((item) => item.avanco >= 100);
+  }, [avancosOrdenadosCronograma]);
 
   const servicoPrevistoDiario = useMemo(() => {
     const dataAlvo = dataMeioDia(dataDiarioSelecionada || hojeISO());
@@ -1423,7 +1433,7 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
         <div className="w-full max-w-md">
           <div className="mb-6 text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-700">Thebalde Camargo</p>
-            <h1 className="mt-2 text-3xl font-black text-slate-950">Controle de Obra V44</h1>
+            <h1 className="mt-2 text-3xl font-black text-slate-950">Controle de Obra V45</h1>
             <p className="mt-2 text-sm text-slate-500">Acesso aberto.</p>
           </div>
 
@@ -1552,7 +1562,7 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-700">Thebalde Camargo</p>
-            <h1 className="text-2xl font-bold text-slate-950">Controle de Produção e Diário de Obra V44</h1>
+            <h1 className="text-2xl font-bold text-slate-950">Controle de Produção e Diário de Obra V45</h1>
             <p className="text-sm text-slate-500">Obras, diário, produção integrada, cronograma físico, produtividade, fotos no Google Drive e equipe.</p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -1880,10 +1890,13 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
                 <button type="button" onClick={() => setMostrarProdutividade(true)} className="btn-secondary">
                   <BarChart3 size={16} /> Produtividade da equipe
                 </button>
+                <button type="button" onClick={() => setMostrarServicosConcluidos(true)} className="btn-secondary">
+                  <CheckCircle2 size={16} /> Serviços concluídos ({servicosConcluidosDiario.length})
+                </button>
               </div>
 
               <Card titulo="Andamento dos serviços">
-                <TabelaAvanco avancos={avancosOrdenadosCronograma} />
+                <TabelaAvanco avancos={servicosEmAndamentoDiario} />
               </Card>
 
 
@@ -2046,6 +2059,25 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
               </Card>
 
 
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {mostrarServicosConcluidos && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+                  <div className="max-h-[90vh] w-full max-w-6xl overflow-auto rounded-3xl bg-white shadow-2xl">
+                    <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
+                      <div>
+                        <h2 className="text-lg font-bold text-slate-950">Serviços concluídos</h2>
+                        <p className="text-sm text-slate-500">Serviços com 100% de avanço ficam ocultos da página principal e aparecem aqui.</p>
+                      </div>
+                      <button type="button" onClick={() => setMostrarServicosConcluidos(false)} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">×</button>
+                    </div>
+                    <div className="p-5">
+                      <Card titulo="Serviços concluídos">
+                        <TabelaAvanco avancos={servicosConcluidosDiario} />
+                      </Card>
                     </div>
                   </div>
                 </div>
