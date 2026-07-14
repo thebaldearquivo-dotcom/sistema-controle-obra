@@ -194,6 +194,8 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
   const [diarioSemTrabalho, setDiarioSemTrabalho] = useState(false);
   const [motivoSemTrabalho, setMotivoSemTrabalho] = useState("");
   const [servicoDiarioId, setServicoDiarioId] = useState("");
+  const [percentualExecucaoDiario, setPercentualExecucaoDiario] = useState("");
+  const [quantidadeExecucaoDiario, setQuantidadeExecucaoDiario] = useState("");
   const [producaoData, setProducaoData] = useState(hojeISO());
   const [producaoDiarioId, setProducaoDiarioId] = useState("");
   const [servicoProducaoId, setServicoProducaoId] = useState("");
@@ -474,6 +476,71 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
   const avancoServicoDiario = useMemo(() => {
     return avancos.find((item) => item.servico.id === servicoDiarioId)?.avanco || 0;
   }, [avancos, servicoDiarioId]);
+
+  const executadoAtualServicoDiario = useMemo(() => {
+    return avancos.find((item) => item.servico.id === servicoDiarioId)?.executado || 0;
+  }, [avancos, servicoDiarioId]);
+
+  const servicoSelecionadoDiario = useMemo(() => {
+    return servicosObra.find((servico) => servico.id === servicoDiarioId) || null;
+  }, [servicosObra, servicoDiarioId]);
+
+  const quantidadePrevistaServicoDiario = servicoSelecionadoDiario?.qtd_prevista || 0;
+  const unidadeServicoDiario = servicoSelecionadoDiario?.unidade || "";
+  const faltaAtualServicoDiario = Math.max(quantidadePrevistaServicoDiario - executadoAtualServicoDiario, 0);
+  const quantidadeLancamentoDiarioPreview = numeroDigitado(quantidadeExecucaoDiario)
+    || (numeroDigitado(percentualExecucaoDiario) > 0 && quantidadePrevistaServicoDiario > 0
+      ? (quantidadePrevistaServicoDiario * numeroDigitado(percentualExecucaoDiario)) / 100
+      : 0);
+  const executadoTotalAposLancamentoDiario = executadoAtualServicoDiario + quantidadeLancamentoDiarioPreview;
+  const faltaAposLancamentoDiario = Math.max(quantidadePrevistaServicoDiario - executadoTotalAposLancamentoDiario, 0);
+  const avancoAposLancamentoDiario = quantidadePrevistaServicoDiario > 0
+    ? (executadoTotalAposLancamentoDiario / quantidadePrevistaServicoDiario) * 100
+    : 0;
+
+  function numeroDigitado(valor: string) {
+    const texto = String(valor || "").trim().replace(",", ".");
+    if (!texto) return 0;
+    const numero = Number(texto);
+    return Number.isFinite(numero) ? numero : 0;
+  }
+
+  function formatarNumeroInput(valor: number) {
+    if (!Number.isFinite(valor)) return "";
+    const arredondado = Math.round(valor * 10000) / 10000;
+    const texto = String(arredondado);
+    if (!texto.includes(".")) return texto;
+    return texto.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+  }
+
+  function atualizarPercentualExecucaoDiario(valor: string) {
+    setPercentualExecucaoDiario(valor);
+    if (!valor.trim()) {
+      setQuantidadeExecucaoDiario("");
+      return;
+    }
+    const percentualValor = numeroDigitado(valor);
+    if (quantidadePrevistaServicoDiario > 0) {
+      setQuantidadeExecucaoDiario(formatarNumeroInput((quantidadePrevistaServicoDiario * percentualValor) / 100));
+    }
+  }
+
+  function atualizarQuantidadeExecucaoDiario(valor: string) {
+    setQuantidadeExecucaoDiario(valor);
+    if (!valor.trim()) {
+      setPercentualExecucaoDiario("");
+      return;
+    }
+    const quantidadeValor = numeroDigitado(valor);
+    if (quantidadePrevistaServicoDiario > 0) {
+      setPercentualExecucaoDiario(formatarNumeroInput((quantidadeValor / quantidadePrevistaServicoDiario) * 100));
+    }
+  }
+
+  useEffect(() => {
+    setPercentualExecucaoDiario("");
+    setQuantidadeExecucaoDiario("");
+  }, [servicoDiarioId]);
 
   const servicoPrevistoProducao = useMemo(() => {
     const dataAlvo = dataMeioDia(producaoData || hojeISO());
@@ -937,15 +1004,34 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
     if (!diarioSemTrabalho) {
       const servicoId = campo(form, "servico_id") || servicoDiarioId;
       const servicoSelecionado = servicosObra.find((servico) => servico.id === servicoId);
-      const percentualExecucao = numeroCampo(form, "percentual_execucao");
+      const percentualInformado = numeroDigitado(campo(form, "percentual_execucao") || percentualExecucaoDiario);
+      const quantidadeInformada = numeroDigitado(campo(form, "quantidade_execucao") || quantidadeExecucaoDiario);
 
       if (!servicoId || !servicoSelecionado) return setMensagem("Informe o serviço previsto para a data.");
-      if (percentualExecucao <= 0) return setMensagem("Informe a porcentagem executada.");
-      if (percentualExecucao > 100) return setMensagem("A porcentagem executada não pode ser maior que 100%.");
+      if (percentualInformado <= 0 && quantidadeInformada <= 0) return setMensagem("Informe a porcentagem executada ou a quantidade executada.");
       if (pessoasTrabalhando <= 0) return setMensagem("Informe a equipe presente no diário.");
       if (horasTrabalhadas <= 0) return setMensagem("Confira o horário de início e término do diário.");
 
-      const quantidadeCalculada = (servicoSelecionado.qtd_prevista * percentualExecucao) / 100;
+      const quantidadeCalculada = quantidadeInformada > 0
+        ? quantidadeInformada
+        : (servicoSelecionado.qtd_prevista * percentualInformado) / 100;
+
+      const percentualExecucao = percentualInformado > 0
+        ? percentualInformado
+        : servicoSelecionado.qtd_prevista > 0
+          ? (quantidadeCalculada / servicoSelecionado.qtd_prevista) * 100
+          : 0;
+
+      if (percentualExecucao <= 0) return setMensagem("Informe a porcentagem executada ou a quantidade executada.");
+      if (percentualExecucao > 100) return setMensagem("A porcentagem executada não pode ser maior que 100%.");
+
+      const executadoAnterior = soma(producoesObra.filter((p) => p.servico_id === servicoId).map((p) => p.quantidade));
+      const executadoTotal = executadoAnterior + quantidadeCalculada;
+      const percentualTotal = servicoSelecionado.qtd_prevista > 0 ? (executadoTotal / servicoSelecionado.qtd_prevista) * 100 : 0;
+
+      if (executadoTotal > servicoSelecionado.qtd_prevista + 0.0001) {
+        return setMensagem(`Este lançamento ultrapassa o total previsto do serviço. Já executado: ${numero(executadoAnterior)} ${servicoSelecionado.unidade}. Falta executar: ${numero(Math.max(servicoSelecionado.qtd_prevista - executadoAnterior, 0))} ${servicoSelecionado.unidade}.`);
+      }
 
       producaoItem = {
         id: uuid(),
@@ -956,7 +1042,7 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
         quantidade: quantidadeCalculada,
         pessoas: pessoasTrabalhando,
         horas: horasTrabalhadas,
-        observacoes: `Percentual executado no lançamento: ${numero(percentualExecucao, 2)}%`,
+        observacoes: `Percentual executado no lançamento: ${numero(percentualExecucao, 2)}% • Total acumulado após lançamento: ${numero(percentualTotal, 2)}%`,
         data: dataDiario,
       };
     }
@@ -1023,6 +1109,8 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
     setMotivoSemTrabalho("");
     setEquipePresenteModo("completa");
     setEquipeIncompletaTexto("");
+    setPercentualExecucaoDiario("");
+    setQuantidadeExecucaoDiario("");
     setMostrarNovoDiario(false);
     setMensagem(producaoItem ? "Diário de obra e produção salvos com sucesso." : "Diário sem trabalho salvo com sucesso.");
   }
@@ -1433,7 +1521,7 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
         <div className="w-full max-w-md">
           <div className="mb-6 text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-700">Thebalde Camargo</p>
-            <h1 className="mt-2 text-3xl font-black text-slate-950">Controle de Obra V45</h1>
+            <h1 className="mt-2 text-3xl font-black text-slate-950">Controle de Obra V52</h1>
             <p className="mt-2 text-sm text-slate-500">Acesso aberto.</p>
           </div>
 
@@ -1562,7 +1650,7 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-700">Thebalde Camargo</p>
-            <h1 className="text-2xl font-bold text-slate-950">Controle de Produção e Diário de Obra V45</h1>
+            <h1 className="text-2xl font-bold text-slate-950">Controle de Produção e Diário de Obra V52</h1>
             <p className="text-sm text-slate-500">Obras, diário, produção integrada, cronograma físico, produtividade, fotos no Google Drive e equipe.</p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -2005,36 +2093,72 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
                         )}
                       </div>
 
-                      <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:col-span-2 md:grid-cols-3">
+                      <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:col-span-2 md:grid-cols-2 xl:grid-cols-3">
                         <label className="grid gap-1 text-sm font-semibold text-slate-700">
                           Serviço previsto para a data
                           <select
                             name="servico_id"
                             value={servicoDiarioId}
                             onChange={(event) => setServicoDiarioId(event.target.value)}
-                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 font-normal text-slate-800 shadow-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-medium shadow-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
                           >
                             {servicosObra.map((s) => <option key={s.id} value={s.id}>{s.nome} ({s.unidade})</option>)}
                           </select>
-                          <span className="text-xs font-semibold text-cyan-700">Andamento atual: {percentual(avancoServicoDiario)}</span>
+                          <span className="text-xs font-semibold text-cyan-700">
+                            Andamento atual: {percentual(avancoServicoDiario)}{unidadeServicoDiario ? ` • Executado atual: ${numero(executadoAtualServicoDiario)} ${unidadeServicoDiario} • Falta executar: ${numero(faltaAtualServicoDiario)} ${unidadeServicoDiario}` : ""}
+                          </span>
+                          {quantidadeLancamentoDiarioPreview > 0 && unidadeServicoDiario && (
+                            <span className="text-xs font-medium text-slate-500">
+                              Com este lançamento: total executado {numero(executadoTotalAposLancamentoDiario)} {unidadeServicoDiario} • falta {numero(faltaAposLancamentoDiario)} {unidadeServicoDiario} • andamento total {percentual(avancoAposLancamentoDiario)}
+                            </span>
+                          )}
                         </label>
-                        <Input name="percentual_execucao" label="Porcentagem executada (%)" type="number" step="0.01" placeholder="Ex.: 25" />
+
                         <label className="grid gap-1 text-sm font-semibold text-slate-700">
-                          Nº de pessoas
+                          Porcentagem executada (%)
                           <input
+                            name="percentual_execucao"
                             type="number"
-                            value={pessoasDiarioAutomatico}
-                            readOnly
-                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 font-normal text-slate-800 shadow-sm"
+                            step="0.0001"
+                            min="0"
+                            value={percentualExecucaoDiario}
+                            onChange={(event) => atualizarPercentualExecucaoDiario(event.target.value)}
+                            placeholder="Ex.: 25"
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-medium shadow-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
                           />
                         </label>
+
+                        <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                          Quantidade executada {unidadeServicoDiario ? `(${unidadeServicoDiario})` : ""}
+                          <input
+                            name="quantidade_execucao"
+                            type="number"
+                            step="0.0001"
+                            min="0"
+                            value={quantidadeExecucaoDiario}
+                            onChange={(event) => atualizarQuantidadeExecucaoDiario(event.target.value)}
+                            placeholder={unidadeServicoDiario ? `Ex.: 10 ${unidadeServicoDiario}` : "Ex.: 10"}
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-medium shadow-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+                          />
+                        </label>
+
                         <label className="grid gap-1 text-sm font-semibold text-slate-700">
                           Horas trabalhadas
                           <input
-                            type="text"
+                            name="horas_auto"
                             value={numero(horasDiarioAutomatico, 1)}
                             readOnly
-                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 font-normal text-slate-800 shadow-sm"
+                            className="rounded-xl border border-slate-200 bg-slate-100 px-3 py-3 text-sm font-medium shadow-sm"
+                          />
+                        </label>
+
+                        <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                          Nº de pessoas
+                          <input
+                            name="pessoas_auto"
+                            value={pessoasDiarioAutomatico}
+                            readOnly
+                            className="rounded-xl border border-slate-200 bg-slate-100 px-3 py-3 text-sm font-medium shadow-sm"
                           />
                         </label>
                       </div>
