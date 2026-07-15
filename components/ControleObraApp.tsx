@@ -1521,7 +1521,7 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
         <div className="w-full max-w-md">
           <div className="mb-6 text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-700">Thebalde Camargo</p>
-            <h1 className="mt-2 text-3xl font-black text-slate-950">Controle de Obra V52</h1>
+            <h1 className="mt-2 text-3xl font-black text-slate-950">Controle de Obra V55</h1>
             <p className="mt-2 text-sm text-slate-500">Acesso aberto.</p>
           </div>
 
@@ -1634,7 +1634,7 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
             )}
 
             <div className="w-full">
-              <GraficoCronograma cronograma={cronogramaFisico} dataInicioObra={obraSelecionada.data_inicio} producoes={producoesObra} diarios={diariosObra} prazoStatus={statusPrazo === "Atrasado" ? "Fora do prazo" : statusPrazo} />
+              <GraficoCronograma cronograma={cronogramaFisico} dataInicioObra={obraSelecionada.data_inicio} producoes={producoesObra} diarios={diariosObra} fotos={fotosObra} prazoStatus={statusPrazo === "Atrasado" ? "Fora do prazo" : statusPrazo} />
             </div>
           </section>
             </div>
@@ -1650,7 +1650,7 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-700">Thebalde Camargo</p>
-            <h1 className="text-2xl font-bold text-slate-950">Controle de Produção e Diário de Obra V52</h1>
+            <h1 className="text-2xl font-bold text-slate-950">Controle de Produção e Diário de Obra V55</h1>
             <p className="text-sm text-slate-500">Obras, diário, produção integrada, cronograma físico, produtividade, fotos no Google Drive e equipe.</p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -2394,7 +2394,7 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
                     <FileDown size={16} /> Gerar PDF A1
                   </button>
                 </div>
-                <GraficoCronograma cronograma={cronogramaFisico} dataInicioObra={obraSelecionada.data_inicio} producoes={producoesObra} diarios={diariosObra} prazoStatus={avancoGeral + 5 < previstoGeral ? "Fora do prazo" : avancoGeral > previstoGeral + 5 ? "Adiantado" : "No prazo"} />
+                <GraficoCronograma cronograma={cronogramaFisico} dataInicioObra={obraSelecionada.data_inicio} producoes={producoesObra} diarios={diariosObra} fotos={fotosObra} prazoStatus={avancoGeral + 5 < previstoGeral ? "Fora do prazo" : avancoGeral > previstoGeral + 5 ? "Adiantado" : "No prazo"} />
               </Card>
 
               <Card titulo="Resumo do cronograma físico" subtitulo="Tabela de apoio com sequência, datas previstas e comparação entre previsto e realizado.">
@@ -2714,6 +2714,7 @@ function GraficoCronograma({
   dataInicioObra,
   producoes,
   diarios,
+  fotos,
   prazoStatus,
 }: {
   cronograma: {
@@ -2733,10 +2734,12 @@ function GraficoCronograma({
   dataInicioObra: string | null;
   producoes: Producao[];
   diarios: Diario[];
+  fotos: FotoDiario[];
   prazoStatus: string;
 }) {
   const barraTopoRef = useRef<HTMLDivElement | null>(null);
   const graficoDiasRef = useRef<HTMLDivElement | null>(null);
+  const [diarioCronogramaSelecionado, setDiarioCronogramaSelecionado] = useState<{ data: string; servicoId: string; servicoNome: string } | null>(null);
 
   if (!cronograma.length || !dataInicioObra) {
     return <Empty text="Cadastre a data de início da obra e os serviços para gerar o gráfico." />;
@@ -2891,18 +2894,35 @@ function GraficoCronograma({
                       const quantidadeExecutadaAteDia = soma(producoesDoServico.filter((producao) => producao.data <= dataDia).map((producao) => producao.quantidade));
                       const percentualExecutadoDia = item.servico.qtd_prevista > 0 ? Math.min((quantidadeExecutadaAteDia / item.servico.qtd_prevista) * 100, 100) : 0;
                       const dentroExecutado = diaUtilDoServico && percentualExecutadoDia > 0 && dataDia >= primeiraDataProducao && dataDia <= ultimaDataProducao;
+                      const semTrabalhoClicavel = Boolean(motivoSemTrabalho && !fimSemana && dentroIntervalo);
                       const tituloSemTrabalho = motivoSemTrabalho ? `${dataBR(dataDia)} • sem trabalho: ${motivoSemTrabalho}` : "";
 
                       return (
                         <div key={dia.indice} className={`h-[72px] border border-slate-200 px-0 py-0 align-top ${motivoSemTrabalho ? "bg-red-100" : fimSemana ? "bg-red-50" : "bg-white"}`}>
                           <div className="grid h-full grid-rows-2">
-                            <div
-                              className={`${motivoSemTrabalho && dentroIntervalo ? "bg-red-500" : diaUtilDoServico ? "bg-orange-400" : "bg-transparent"}`}
-                              title={motivoSemTrabalho && dentroIntervalo ? tituloSemTrabalho : diaUtilDoServico ? `${item.servico.nome} • ${dataBR(dataDia)} • previsto acumulado: ${percentual(percentualPrevistoDia)}` : fimSemana ? `${dataBR(dataDia)} • sábado/domingo não contado` : ""}
+                            <button
+                              type="button"
+                              disabled={!semTrabalhoClicavel}
+                              onClick={() => {
+                                if (semTrabalhoClicavel) {
+                                  setDiarioCronogramaSelecionado({ data: dataDia, servicoId: item.servico.id, servicoNome: item.servico.nome });
+                                }
+                              }}
+                              className={`${motivoSemTrabalho && dentroIntervalo ? semTrabalhoClicavel ? "bg-red-500 hover:ring-2 hover:ring-cyan-500 cursor-pointer" : "bg-red-500 cursor-default" : diaUtilDoServico ? "bg-orange-400" : "bg-transparent"} h-full w-full`}
+                              title={semTrabalhoClicavel ? `${tituloSemTrabalho} • clique para abrir o diário de obra` : motivoSemTrabalho && dentroIntervalo ? tituloSemTrabalho : diaUtilDoServico ? `${item.servico.nome} • ${dataBR(dataDia)} • previsto acumulado: ${percentual(percentualPrevistoDia)}` : fimSemana ? `${dataBR(dataDia)} • sábado/domingo não contado` : ""}
+                              aria-label={semTrabalhoClicavel ? `Abrir diário sem trabalho de ${dataBR(dataDia)}` : "Sem ação"}
                             />
-                            <div
-                              className={`${motivoSemTrabalho && dentroIntervalo ? "bg-red-500" : dentroExecutado ? "bg-lime-400" : "bg-transparent"}`}
-                              title={motivoSemTrabalho && dentroIntervalo ? tituloSemTrabalho : dentroExecutado ? `${item.servico.nome} • ${dataBR(dataDia)} • executado acumulado: ${percentual(percentualExecutadoDia)}` : fimSemana ? `${dataBR(dataDia)} • sábado/domingo não contado` : ""}
+                            <button
+                              type="button"
+                              disabled={!dentroExecutado && !semTrabalhoClicavel}
+                              onClick={() => {
+                                if (dentroExecutado || semTrabalhoClicavel) {
+                                  setDiarioCronogramaSelecionado({ data: dataDia, servicoId: item.servico.id, servicoNome: item.servico.nome });
+                                }
+                              }}
+                              className={`${motivoSemTrabalho && dentroIntervalo ? semTrabalhoClicavel ? "bg-red-500 hover:ring-2 hover:ring-cyan-500 cursor-pointer" : "bg-red-500 cursor-default" : dentroExecutado ? "bg-lime-400 hover:ring-2 hover:ring-cyan-500 cursor-pointer" : "bg-transparent cursor-default"} h-full w-full`}
+                              title={semTrabalhoClicavel ? `${tituloSemTrabalho} • clique para abrir o diário de obra` : motivoSemTrabalho && dentroIntervalo ? tituloSemTrabalho : dentroExecutado ? `${item.servico.nome} • ${dataBR(dataDia)} • clique para abrir o diário de obra` : fimSemana ? `${dataBR(dataDia)} • sábado/domingo não contado` : ""}
+                              aria-label={dentroExecutado || semTrabalhoClicavel ? `Abrir diário de obra de ${dataBR(dataDia)} - ${item.servico.nome}` : "Sem produção lançada neste dia"}
                             />
                           </div>
                         </div>
@@ -2915,6 +2935,111 @@ function GraficoCronograma({
           </div>
         </div>
       </div>
+
+      {diarioCronogramaSelecionado && (() => {
+        const diariosDoDia = diarios.filter((diario) => diario.data === diarioCronogramaSelecionado.data);
+        const producoesDoDia = producoes.filter((producao) => producao.data === diarioCronogramaSelecionado.data && producao.servico_id === diarioCronogramaSelecionado.servicoId);
+        const servico = cronograma.find((item) => item.servico.id === diarioCronogramaSelecionado.servicoId)?.servico;
+        const quantidadeDia = soma(producoesDoDia.map((producao) => producao.quantidade));
+        const percentualDia = servico && servico.qtd_prevista > 0 ? (quantidadeDia / servico.qtd_prevista) * 100 : 0;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+            <div className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-3xl bg-white shadow-2xl">
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-950">Diário de obra — {dataBR(diarioCronogramaSelecionado.data)}</h2>
+                  <p className="text-sm text-slate-500">{diarioCronogramaSelecionado.servicoNome}</p>
+                </div>
+                <button type="button" onClick={() => setDiarioCronogramaSelecionado(null)} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">×</button>
+              </div>
+
+              <div className="grid gap-4 p-5">
+                {diariosDoDia.some((diario) => /sem trabalho/i.test(String(diario.equipe_resumo || "")) || /sem trabalho/i.test(String(diario.servicos_executados || ""))) && (
+                  <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+                    <p className="text-xs font-bold uppercase text-red-700">Dia sem trabalho</p>
+                    <p className="mt-1 text-sm text-red-800">
+                      Motivo: {diariosDoDia.find((diario) => /sem trabalho/i.test(String(diario.equipe_resumo || "")) || /sem trabalho/i.test(String(diario.servicos_executados || "")))?.ocorrencias || "Motivo não informado."}
+                    </p>
+                  </div>
+                )}
+
+                {producoesDoDia.length > 0 && (
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                    <p className="text-xs font-bold uppercase text-emerald-700">Produção do serviço no dia</p>
+                    <div className="mt-2 grid gap-2 text-sm text-slate-700 md:grid-cols-3">
+                      <div><b>Serviço:</b> {diarioCronogramaSelecionado.servicoNome}</div>
+                      <div><b>Quantidade do dia:</b> {numero(quantidadeDia)} {servico?.unidade || ""}</div>
+                      <div><b>% do serviço no dia:</b> {percentual(percentualDia)}</div>
+                    </div>
+                  </div>
+                )}
+
+                {diariosDoDia.length > 0 ? (
+                  diariosDoDia.map((diario) => {
+                    const producoesVinculadas = producoes.filter((producao) => producao.diario_id === diario.id);
+                    return (
+                      <article key={diario.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <h3 className="font-bold text-slate-950">Diário lançado</h3>
+                            <p className="text-xs text-slate-500">{diario.horario_inicio || "--:--"} às {diario.horario_termino || "--:--"} • {diario.clima || "Clima não informado"}</p>
+                          </div>
+                        </div>
+                        <div className="grid gap-2 text-sm text-slate-700">
+                          <p><b>Equipe:</b> {diario.equipe_resumo || "-"}</p>
+                          <p><b>Serviços executados:</b> {diario.servicos_executados || "-"}</p>
+                          <p><b>Ocorrências:</b> {diario.ocorrencias || "-"}</p>
+                          <p><b>Responsável:</b> {diario.responsavel_lancamento || "-"}</p>
+                        </div>
+
+                        {producoesVinculadas.length > 0 && (
+                          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                            <p className="mb-2 text-xs font-bold uppercase text-slate-500">Produtividade lançada neste diário</p>
+                            <div className="grid gap-2">
+                              {producoesVinculadas.map((producao) => {
+                                const servicoProducao = cronograma.find((item) => item.servico.id === producao.servico_id)?.servico;
+                                const percentualProducao = servicoProducao && servicoProducao.qtd_prevista > 0 ? (producao.quantidade / servicoProducao.qtd_prevista) * 100 : 0;
+                                return (
+                                  <div key={producao.id} className="rounded-xl bg-white p-3 text-sm text-slate-700">
+                                    <b>{servicoProducao?.nome || "Serviço"}</b> • {numero(producao.quantidade)} {servicoProducao?.unidade || ""} • {percentual(percentualProducao)} • {producao.pessoas} pessoa(s) • {numero(producao.horas, 1)}h
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {fotos.filter((foto) => foto.diario_id === diario.id).length > 0 && (
+                          <div className="mt-4 rounded-2xl border border-cyan-200 bg-cyan-50 p-3">
+                            <p className="mb-2 text-xs font-bold uppercase text-cyan-700">Fotos do diário</p>
+                            <div className="grid gap-2">
+                              {fotos.filter((foto) => foto.diario_id === diario.id).map((foto, index) => (
+                                <a
+                                  key={foto.id}
+                                  href={foto.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-cyan-700 hover:bg-cyan-100"
+                                >
+                                  <span>{foto.descricao || `Foto ${index + 1}`}</span>
+                                  <span className="inline-flex items-center gap-1">Abrir foto <ExternalLink size={14} /></span>
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </article>
+                    );
+                  })
+                ) : (
+                  <Empty text="Não encontrei diário de obra lançado para esta data." />
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
