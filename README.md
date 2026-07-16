@@ -1,8 +1,8 @@
-# Sistema Controle de Obra - V55
+# Sistema Controle de Obra - V60
 
-Versão V55 com melhorias no Diário de Obra e no Cronograma Físico.
+Versão V60 com melhorias no Diário de Obra e no Cronograma Físico.
 
-## Alterações da V55
+## Alterações da V60
 
 - No lançamento do Diário de Obra, ao selecionar sábado ou domingo, aparece a opção de salvar como sábado/domingo sem trabalho ou marcar como trabalhado.
 - Nos dias úteis, foi adicionada a opção Dia sem trabalho.
@@ -21,7 +21,7 @@ Versão V55 com melhorias no Diário de Obra e no Cronograma Físico.
 Não precisa rodar SQL novo nesta versão.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - Em Produção do dia, o lançamento agora é feito por **Porcentagem executada (%)**.
 - O sistema calcula automaticamente a quantidade executada com base na quantidade prevista do serviço.
@@ -29,7 +29,7 @@ Não precisa rodar SQL novo nesta versão.
 - Avanço físico, produtividade e cronograma continuam sendo atualizados automaticamente.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - Em Produção do dia, removido o campo Local.
 - O campo Nº de pessoas agora é preenchido automaticamente pela equipe presente no Diário de Obra selecionado.
@@ -39,34 +39,34 @@ Não precisa rodar SQL novo nesta versão.
 - O serviço vem automaticamente selecionado conforme o cronograma físico previsto para a data escolhida.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - Em Produção do dia, o campo “Vincular ao diário” agora oculta automaticamente os diários que já foram vinculados a uma produção.
 - A opção “Sem vínculo” continua disponível.
 - Ao salvar uma produção vinculada a um diário, o sistema limpa a seleção para evitar reutilização do mesmo diário.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - Na Produção do dia, abaixo do campo **Serviço previsto para a data**, agora aparece o **andamento atual do serviço selecionado** em porcentagem.
 - O valor muda automaticamente ao trocar o serviço selecionado.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - Removidos textos explicativos longos do menu Diário de Obra.
 - No gráfico do Cronograma Físico, ao passar o mouse no quadrado laranja aparece a porcentagem prevista acumulada daquele serviço naquele dia.
 - No gráfico do Cronograma Físico, ao passar o mouse no quadrado verde aparece a porcentagem executada acumulada daquele serviço naquele dia.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - Em **Vincular ao diário**, os diários marcados como **Sem trabalho** não aparecem mais na lista.
 - Isso vale para sábado sem trabalho, domingo sem trabalho e qualquer outro dia salvo como dia sem trabalho.
 - A lista continua mostrando apenas diários trabalhados que ainda não foram vinculados a uma produção.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - Corrigido o gráfico do Cronograma Físico.
 - A barra verde agora não é mais distribuída automaticamente pela porcentagem do serviço.
@@ -75,7 +75,7 @@ Não precisa rodar SQL novo nesta versão.
 - Ao passar o mouse no verde, aparece o executado acumulado real até aquele dia.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - A Produção do dia agora é lançada junto com o Diário de Obra.
 - Removida a tela separada de Produção do dia.
@@ -88,21 +88,21 @@ Não precisa rodar SQL novo nesta versão.
 - As horas trabalhadas vêm automaticamente do horário de início e término do diário.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - Corrigido o aviso do React ao alternar o Diário de Obra entre dia trabalhado e dia sem trabalho.
 - Ajustado o componente de campos do formulário para não trocar input controlado por não controlado.
 - Adicionada separação interna entre o formulário de dia trabalhado e sem trabalho para evitar reaproveitamento incorreto dos campos.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - No Gráfico do Cronograma Físico, os dias salvos no Diário de Obra como **Sem trabalho** aparecem em vermelho dentro da atividade.
 - Ao passar o mouse no dia vermelho, aparece o motivo informado no diário sem trabalho.
 - A marcação vale para sábado, domingo e qualquer outro dia salvo como dia sem trabalho.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - No menu Cronograma Físico, o gráfico agora fica dentro de uma área com rolagem própria.
 - A página não cresce mais por causa do gráfico grande.
@@ -110,7 +110,7 @@ Não precisa rodar SQL novo nesta versão.
 - O cabeçalho do gráfico fica fixo dentro da área de rolagem.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - Corrigida a rolagem do Gráfico do Cronograma Físico.
 - A rolagem horizontal agora fica dentro da caixa do gráfico, e não mais na página inteira.
@@ -118,30 +118,30 @@ Não precisa rodar SQL novo nesta versão.
 - Os demais itens da página permanecem visíveis.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - Adicionado botão **Gerar PDF A2** no menu Cronograma Físico.
 - O botão gera automaticamente o PDF do gráfico em tamanho **A2 horizontal**.
 - O arquivo é salvo pelo navegador como download.
 - Adicionadas as dependências `html2canvas` e `jspdf` para geração do PDF.
-- Após substituir pela V55, rode `INSTALAR.bat` para instalar as novas dependências.
+- Após substituir pela V60, rode `INSTALAR.bat` para instalar as novas dependências.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - Corrigida a geração do PDF A2 do cronograma físico.
 - O PDF agora captura o **gráfico completo**, não apenas a parte visível na tela.
 - A exportação usa uma cópia temporária do conteúdo completo do cronograma para evitar cortes.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - O botão de exportação agora gera o cronograma em **PDF A1**.
 - O PDF passa a incluir um resumo com: início previsto, término previsto, dias total da obra previsto (com sábados e domingos), dias úteis previsto, dias trabalhados, % de andamento e situação do prazo.
 - O gráfico completo continua sendo exportado, sem cortar apenas a parte visível da tela.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - Em **Serviços e avanço físico**, a visualização foi reorganizada em cards compactos para caber tudo sem barra de rolagem horizontal.
 - Os dados de previsto, executado, falta, avanço, dias previstos e dias executados continuam aparecendo.
@@ -149,7 +149,7 @@ Não precisa rodar SQL novo nesta versão.
 - O botão **OK** salva a edição e fecha a telinha automaticamente.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - Dashboard simplificado para mostrar somente:
   - andamento da obra;
@@ -163,7 +163,7 @@ Não precisa rodar SQL novo nesta versão.
 - O resumo mostra dias trabalhados, dias sem trabalho, ocorrências, produções vinculadas e fotos.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - Acesso por login e senha removido; o sistema agora abre direto.
 - Removidos os botões/menus **Materiais** e **Relatórios** do menu lateral.
@@ -178,7 +178,7 @@ Não precisa rodar SQL novo nesta versão.
 - A tela **Resumo do Diário de Obra** também mostra o resumo dos serviços antes da lista dos diários.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - No Dashboard, o prazo agora vem do Cronograma Físico.
 - O Dashboard mostra:
@@ -191,7 +191,7 @@ Não precisa rodar SQL novo nesta versão.
 - Cada troca de menu agora remonta a página ativa, deixando a navegação mais leve e separada visualmente.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - Criada estrutura de rotas separadas no Next.js:
   - `app/page.tsx`
@@ -215,13 +215,13 @@ Não precisa rodar SQL novo nesta versão.
 - Foi mantido o motor principal do sistema para preservar todos os dados e funcionalidades existentes.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - No Dashboard, o botão **Abrir resumo do diário** foi renomeado para **Abrir diário de obra**.
 - O botão agora acessa a rota real `/diario`, mantendo a lógica de páginas e rotas separadas.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - Na página Diário de Obra, o cadastro de novo diário agora fica em um botão **Novo diário de obra** que abre uma telinha/modal.
 - A telinha de novo diário possui botão **OK** para confirmar.
@@ -236,7 +236,7 @@ Não precisa rodar SQL novo nesta versão.
 - Em **Andamento dos serviços**, os serviços foram ordenados conforme a sequência do Cronograma Físico, do início para o final.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - Dentro de **Diários lançados**, as fotos não aparecem mais com visualização prévia.
 - As fotos agora aparecem como links para clicar e abrir no Drive.
@@ -249,14 +249,14 @@ Não precisa rodar SQL novo nesta versão.
   - pessoas, horas e produtividade por homem/hora.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - No Cronograma Físico, removida a barra de rolagem vertical do gráfico.
 - Agora todos os serviços aparecem completos na tela.
 - Mantida a barra de rolagem horizontal inferior para navegar pelos dias do cronograma.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - A página **Cronograma Físico** agora tem layout próprio em tela cheia, inspirado no formato do Kanban.
 - Removido o menu lateral nessa página para o cronograma ocupar a tela toda.
@@ -271,7 +271,7 @@ Não precisa rodar SQL novo nesta versão.
 - O gráfico do cronograma físico ocupa a página toda, mantendo a barra de rolagem horizontal inferior.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - Na página Cronograma Físico, a parte superior com botões, resumos e informações fica fixa.
 - Os resumos foram compactados para caber melhor no topo.
@@ -280,7 +280,7 @@ Não precisa rodar SQL novo nesta versão.
 - A área dos serviços do gráfico fica abaixo da parte fixa.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - Na página Cronograma Físico, somente o topo com os botões fica fixo.
 - A rolagem vertical agora movimenta toda a área abaixo do topo, incluindo resumos, informações e gráfico.
@@ -288,7 +288,7 @@ Não precisa rodar SQL novo nesta versão.
 - A barra horizontal do cronograma continua acima do cabeçalho **Serviço** e rola somente os dias do gráfico.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - Mantida a lógica da V41: somente os botões do topo ficam fixos.
 - A área abaixo do topo continua rolando normalmente, incluindo resumos, informações e gráfico.
@@ -299,7 +299,7 @@ Não precisa rodar SQL novo nesta versão.
 - A coluna dos serviços fica fixa e visível.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - Mantido o layout da V43.
 - Adicionada uma barra de rolagem horizontal acima do gráfico, na posição indicada.
@@ -308,7 +308,7 @@ Não precisa rodar SQL novo nesta versão.
 - A coluna da esquerda com os serviços permanece fixa.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - Na página Diário de Obra, adicionado botão **Serviços concluídos**.
 - Serviços com avanço de **100%** ficam ocultos do quadro principal **Andamento dos serviços**.
@@ -316,7 +316,7 @@ Não precisa rodar SQL novo nesta versão.
 - O botão mostra a quantidade de serviços concluídos.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - No lançamento do Diário de Obra, adicionada a informação de **Quantidade executada**.
 - Se informar a **porcentagem executada**, a quantidade é calculada automaticamente.
@@ -324,26 +324,26 @@ Não precisa rodar SQL novo nesta versão.
 - O campo mostra a unidade do serviço selecionado (m², m, un etc.).
 
 
-## Alterações da V55
+## Alterações da V60
 
 - Removido o texto explicativo abaixo do campo **Quantidade executada** no Diário de Obra.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - Ajustado o layout do bloco de lançamento de produção dentro do Diário de Obra.
 - Os campos de serviço, porcentagem, quantidade, número de pessoas e horas trabalhadas foram reorganizados para não ficarem embolados.
 - Em larguras menores, os campos quebram em 2 colunas; em telas maiores, voltam para 4 colunas.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - No Diário de Obra, reorganizado o bloco de lançamento da produção.
 - A linha de cima agora fica com: serviço previsto, porcentagem executada e quantidade executada.
 - O campo **Nº de pessoas** foi movido para a linha de baixo, ao lado de **Horas trabalhadas**.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - Corrigido o cálculo automático entre **Porcentagem executada** e **Quantidade executada**.
 - O erro estava na formatação do número, que removia zeros de números inteiros.
@@ -353,13 +353,13 @@ Não precisa rodar SQL novo nesta versão.
   - 100% de 280 = 280.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - No Diário de Obra, abaixo do campo **Serviço previsto para a data**, o texto **Andamento atual** agora mostra também o valor executado na unidade cadastrada do serviço.
 - Exemplo: `Andamento atual: 10,00% • Executado atual: 28,00 m²`.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - No Diário de Obra, abaixo de **Serviço previsto para a data**, agora também aparece a **quantidade que falta executar** na unidade do serviço.
 - Exemplo: `Falta executar: 255,00 m²`.
@@ -368,7 +368,7 @@ Não precisa rodar SQL novo nesta versão.
 - Adicionada validação para impedir que o lançamento ultrapasse o total previsto do serviço.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - No Cronograma Físico, os quadrinhos verdes de executado agora são clicáveis.
 - Ao clicar em um quadrinho verde, abre uma telinha com o Diário de Obra referente àquele dia.
@@ -381,16 +381,69 @@ Não precisa rodar SQL novo nesta versão.
   - produtividade lançada no diário.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - No Cronograma Físico, ao clicar em um quadrinho verde, o modal do Diário de Obra agora mostra as fotos vinculadas ao diário.
 - As fotos aparecem como links para clicar e abrir.
 - Se o diário não tiver fotos, nada é exibido nessa área.
 
 
-## Alterações da V55
+## Alterações da V60
 
 - No Cronograma Físico, dias marcados como **sem trabalho** em dia útil agora são clicáveis.
 - Ao clicar em um quadrinho vermelho de dia sem trabalho, abre uma telinha com o Diário de Obra daquele dia.
 - A telinha mostra o motivo do dia sem trabalho.
 - Sábados e domingos continuam apenas como final de semana, sem abrir modal por esse ajuste.
+
+
+## Alterações da V60
+
+- No Cronograma Físico, adicionada uma linha acima do cabeçalho **Serviço** e acima dos quadrinhos dos dias.
+- Essa nova linha mostra a **% prevista acumulada da obra em cada dia**.
+- O cálculo usa o cronograma de cada serviço e a média prevista da obra para cada data.
+- Ao passar o mouse no quadrinho, aparece a data e o percentual previsto acumulado da obra.
+
+
+## Alterações da V60
+
+- Refeito o cálculo de **Previsto até hoje** e **Realizado**.
+- Antes o sistema fazia média simples: cada serviço tinha o mesmo peso.
+- Agora o cálculo é ponderado pelos **dias previstos** de cada serviço.
+- Fórmula do realizado:
+  - `% realizado do serviço = quantidade executada acumulada / quantidade prevista do serviço`
+  - `peso do serviço = dias previstos do serviço`
+  - `% realizado da obra = soma(% realizado do serviço × peso do serviço) / soma(pesos)`
+- Fórmula do previsto:
+  - `% previsto do serviço = dias úteis previstos decorridos do serviço / dias previstos do serviço`
+  - `% previsto da obra = soma(% previsto do serviço × peso do serviço) / soma(pesos)`
+- A linha de **% prevista acumulada da obra em cada dia** no Cronograma Físico também passou a usar o mesmo cálculo ponderado.
+
+
+## Alterações da V60
+
+- Corrigida a regra de situação do prazo.
+- Agora não existe mais tolerância de 5%.
+- Se o **Realizado** for menor que o **Previsto**, a obra aparece como **Fora do prazo/Atrasada**.
+- Exemplo: previsto 8,00% e realizado 4,00% = **Fora do prazo**.
+- Se o Realizado for maior que o Previsto, aparece **Adiantado**.
+- Se forem iguais, aparece **No prazo**.
+- Os percentuais permanecem formatados com 2 casas decimais no formato `x,xx%`.
+
+
+## Alterações da V60
+
+- Status de prazo agora fica colorido:
+  - **Atrasado** e **Fora do prazo** em vermelho;
+  - **No prazo** em azul;
+  - **Adiantado** em verde.
+- A regra sem tolerância permanece:
+  - realizado menor que previsto = atrasado/fora do prazo;
+  - realizado maior que previsto = adiantado;
+  - realizado igual ao previsto = no prazo.
+
+
+## Alterações da V60
+
+- No Dashboard, adicionado o card **Previsto para hoje**.
+- Esse card mostra a porcentagem prevista da obra para o dia atual, calculada pelo Cronograma Físico.
+- O card **Andamento da obra** continua mostrando o realizado até hoje.

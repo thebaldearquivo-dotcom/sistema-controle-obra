@@ -1,6 +1,6 @@
 {
-  "name": "v55",
-  "version": "55.0.0",
+  "name": "v60",
+  "version": "60.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3005",

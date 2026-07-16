@@ -267,7 +267,12 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
 
   const avancoGeral = useMemo(() => {
     if (!avancos.length) return 0;
-    return soma(avancos.map((a) => Math.min(a.avanco, 100))) / avancos.length;
+    const pesoTotal = soma(avancos.map((item) => Math.max(Number(item.servico.dias_previstos || 1), 1)));
+    if (pesoTotal <= 0) return 0;
+    return soma(avancos.map((item) => {
+      const peso = Math.max(Number(item.servico.dias_previstos || 1), 1);
+      return Math.min(Math.max(item.avanco, 0), 100) * peso;
+    })) / pesoTotal;
   }, [avancos]);
 
   const cronogramaFisico = useMemo(() => {
@@ -578,7 +583,12 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
 
   const previstoGeral = useMemo(() => {
     if (!cronogramaFisico.length) return 0;
-    return soma(cronogramaFisico.map((item) => item.avancoPrevisto)) / cronogramaFisico.length;
+    const pesoTotal = soma(cronogramaFisico.map((item) => Math.max(Number(item.diasPrevistos || 1), 1)));
+    if (pesoTotal <= 0) return 0;
+    return soma(cronogramaFisico.map((item) => {
+      const peso = Math.max(Number(item.diasPrevistos || 1), 1);
+      return Math.min(Math.max(item.avancoPrevisto, 0), 100) * peso;
+    })) / pesoTotal;
   }, [cronogramaFisico]);
 
   const produtividadeMedia = useMemo(() => {
@@ -605,8 +615,8 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
   }, [obraSelecionada?.data_inicio]);
 
   const situacaoPrazoObra = useMemo(() => {
-    if (avancoGeral + 5 < previstoGeral) return "Fora do prazo";
-    if (avancoGeral > previstoGeral + 5) return "Adiantado";
+    if (avancoGeral < previstoGeral) return "Fora do prazo";
+    if (avancoGeral > previstoGeral) return "Adiantado";
     return "No prazo";
   }, [avancoGeral, previstoGeral]);
 
@@ -1521,7 +1531,7 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
         <div className="w-full max-w-md">
           <div className="mb-6 text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-700">Thebalde Camargo</p>
-            <h1 className="mt-2 text-3xl font-black text-slate-950">Controle de Obra V55</h1>
+            <h1 className="mt-2 text-3xl font-black text-slate-950">Controle de Obra V60</h1>
             <p className="mt-2 text-sm text-slate-500">Acesso aberto.</p>
           </div>
 
@@ -1562,7 +1572,7 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
   }
 
   if (active === "cronograma" && obraSelecionada) {
-    const statusPrazo = avancoGeral + 5 < previstoGeral ? "Atrasado" : avancoGeral > previstoGeral + 5 ? "Adiantado" : "No prazo";
+    const statusPrazo = avancoGeral < previstoGeral ? "Atrasado" : avancoGeral > previstoGeral ? "Adiantado" : "No prazo";
 
     return (
       <main className="h-screen overflow-hidden bg-slate-100 p-3">
@@ -1613,8 +1623,8 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
           )}
 
           <section className="grid gap-2 md:grid-cols-3 xl:grid-cols-6">
-            <Kpi titulo="Previsto até hoje" valor={percentual(previstoGeral)} detalhe="Pelo prazo dos serviços" />
-            <Kpi titulo="Realizado" valor={percentual(avancoGeral)} detalhe="Pela produção lançada" />
+            <Kpi titulo="Previsto até hoje" valor={percentual(previstoGeral)} detalhe="Ponderado pelos dias previstos" />
+            <Kpi titulo="Realizado" valor={percentual(avancoGeral)} detalhe="Produção ponderada por dias previstos" />
             <Kpi titulo="Diferença" valor={percentual(avancoGeral - previstoGeral)} detalhe="Realizado menos previsto" />
             <Kpi titulo="Situação" valor={statusPrazo} detalhe="Comparativo físico" />
             <Kpi titulo="Dias corridos previstos" valor={String(diasTotalPrevistoObra)} detalhe="Pelo cronograma físico" />
@@ -1650,7 +1660,7 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-700">Thebalde Camargo</p>
-            <h1 className="text-2xl font-bold text-slate-950">Controle de Produção e Diário de Obra V55</h1>
+            <h1 className="text-2xl font-bold text-slate-950">Controle de Produção e Diário de Obra V60</h1>
             <p className="text-sm text-slate-500">Obras, diário, produção integrada, cronograma físico, produtividade, fotos no Google Drive e equipe.</p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -1708,8 +1718,9 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
 
           {active === "dashboard" && obraSelecionada && (
             <div className="grid gap-5">
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-                <Kpi titulo="Andamento da obra" valor={percentual(avancoGeral)} detalhe="Média física dos serviços" />
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+                <Kpi titulo="Andamento da obra" valor={percentual(avancoGeral)} detalhe="Realizado até hoje" />
+                <Kpi titulo="Previsto para hoje" valor={percentual(previstoGeral)} detalhe="Pelo cronograma físico" />
                 <Kpi titulo="Dias corridos previstos" valor={String(diasTotalPrevistoObra)} detalhe="Pelo cronograma físico" />
                 <Kpi titulo="Dias úteis previstos" valor={String(diasUteisPrevistosObra)} detalhe="Sem contar sábado e domingo" />
                 <Kpi titulo="Situação do prazo" valor={situacaoPrazoObra} detalhe="Comparativo previsto x realizado" />
@@ -2375,10 +2386,10 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
           {active === "cronograma" && obraSelecionada && (
             <div className="grid gap-5">
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <Kpi titulo="Previsto até hoje" valor={percentual(previstoGeral)} detalhe="Pelo prazo dos serviços" />
-                <Kpi titulo="Realizado" valor={percentual(avancoGeral)} detalhe="Pela produção lançada" />
+                <Kpi titulo="Previsto até hoje" valor={percentual(previstoGeral)} detalhe="Ponderado pelos dias previstos" />
+                <Kpi titulo="Realizado" valor={percentual(avancoGeral)} detalhe="Produção ponderada por dias previstos" />
                 <Kpi titulo="Diferença" valor={percentual(avancoGeral - previstoGeral)} detalhe="Realizado menos previsto" />
-                <Kpi titulo="Situação" valor={avancoGeral + 5 < previstoGeral ? "Atrasado" : avancoGeral > previstoGeral + 5 ? "Adiantado" : "No prazo"} detalhe="Comparativo físico" />
+                <Kpi titulo="Situação" valor={avancoGeral < previstoGeral ? "Atrasado" : avancoGeral > previstoGeral ? "Adiantado" : "No prazo"} detalhe="Comparativo físico" />
               </div>
 
               <Card titulo="Gráfico do cronograma físico" subtitulo="Em dias, iniciando na data inicial da obra, com prazo previsto e andamento atual de cada serviço.">
@@ -2394,7 +2405,7 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
                     <FileDown size={16} /> Gerar PDF A1
                   </button>
                 </div>
-                <GraficoCronograma cronograma={cronogramaFisico} dataInicioObra={obraSelecionada.data_inicio} producoes={producoesObra} diarios={diariosObra} fotos={fotosObra} prazoStatus={avancoGeral + 5 < previstoGeral ? "Fora do prazo" : avancoGeral > previstoGeral + 5 ? "Adiantado" : "No prazo"} />
+                <GraficoCronograma cronograma={cronogramaFisico} dataInicioObra={obraSelecionada.data_inicio} producoes={producoesObra} diarios={diariosObra} fotos={fotosObra} prazoStatus={avancoGeral < previstoGeral ? "Fora do prazo" : avancoGeral > previstoGeral ? "Adiantado" : "No prazo"} />
               </Card>
 
               <Card titulo="Resumo do cronograma físico" subtitulo="Tabela de apoio com sequência, datas previstas e comparação entre previsto e realizado.">
@@ -2427,7 +2438,7 @@ export default function ControleObraApp({ paginaInicial = "dashboard" }: { pagin
                           <td className="p-3 text-right">{percentual(item.avancoPrevisto)}</td>
                           <td className="p-3 text-right font-bold">{percentual(item.avancoReal)}</td>
                           <td className="p-3 text-right">{percentual(item.diferenca)}</td>
-                          <td className="p-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">{item.situacao}</span></td>
+                          <td className="p-3"><span className={`rounded-full px-3 py-1 text-xs font-bold ${classeStatusBadge(item.situacao)}`}>{item.situacao}</span></td>
                         </tr>
                       ))}
                     </tbody>
@@ -2603,11 +2614,29 @@ function Card({ titulo, subtitulo, children }: { titulo: string; subtitulo?: str
   );
 }
 
+function classeStatusTexto(valor: string) {
+  const texto = String(valor || "").toLowerCase();
+  if (texto.includes("atrasado") || texto.includes("fora do prazo")) return "text-red-700";
+  if (texto.includes("no prazo")) return "text-blue-700";
+  if (texto.includes("adiantado")) return "text-emerald-700";
+  if (texto.includes("concluído") || texto.includes("concluido")) return "text-emerald-700";
+  return "text-slate-950";
+}
+
+function classeStatusBadge(valor: string) {
+  const texto = String(valor || "").toLowerCase();
+  if (texto.includes("atrasado") || texto.includes("fora do prazo")) return "bg-red-50 text-red-700 border border-red-200";
+  if (texto.includes("no prazo")) return "bg-blue-50 text-blue-700 border border-blue-200";
+  if (texto.includes("adiantado")) return "bg-emerald-50 text-emerald-700 border border-emerald-200";
+  if (texto.includes("concluído") || texto.includes("concluido")) return "bg-emerald-50 text-emerald-700 border border-emerald-200";
+  return "bg-slate-100 text-slate-700 border border-slate-200";
+}
+
 function Kpi({ titulo, valor, detalhe }: { titulo: string; valor: string; detalhe: string }) {
   return (
     <div className="min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-soft">
       <p className="text-sm font-semibold text-slate-500">{titulo}</p>
-      <p className="mt-2 text-3xl font-black text-slate-950">{valor}</p>
+      <p className={`mt-2 text-3xl font-black ${classeStatusTexto(valor)}`}>{valor}</p>
       <p className="mt-1 text-xs text-slate-500">{detalhe}</p>
     </div>
   );
@@ -2767,7 +2796,10 @@ function GraficoCronograma({
       .filter((diario) => !(/sem trabalho/i.test(String(diario.equipe_resumo || "")) || /sem trabalho/i.test(String(diario.servicos_executados || ""))))
       .map((diario) => diario.data)
   ).size;
-  const andamentoAtual = cronograma.length ? soma(cronograma.map((item) => Math.min(item.avancoReal, 100))) / cronograma.length : 0;
+  const pesoTotalCronograma = soma(cronograma.map((item) => Math.max(Number(item.diasPrevistos || 1), 1)));
+  const andamentoAtual = pesoTotalCronograma > 0
+    ? soma(cronograma.map((item) => Math.min(Math.max(item.avancoReal, 0), 100) * Math.max(Number(item.diasPrevistos || 1), 1))) / pesoTotalCronograma
+    : 0;
 
   const larguraDias = dias.length * 38;
 
@@ -2802,7 +2834,7 @@ function GraficoCronograma({
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"><div className="text-[10px] uppercase text-slate-500">Dias úteis previsto</div><div className="text-lg font-bold text-slate-900">{diasUteisPrevistos}</div><div className="text-[10px] text-slate-500">Sem sábados e domingos</div></div>
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"><div className="text-[10px] uppercase text-slate-500">Dias trabalhados</div><div className="text-lg font-bold text-slate-900">{diasTrabalhados}</div><div className="text-[10px] text-slate-500">Com diário trabalhado</div></div>
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"><div className="text-[10px] uppercase text-slate-500">% andamento</div><div className="text-lg font-bold text-slate-900">{percentual(andamentoAtual)}</div><div className="text-[10px] text-slate-500">Média física</div></div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"><div className="text-[10px] uppercase text-slate-500">Situação</div><div className="text-lg font-bold text-slate-900">{prazoStatus}</div><div className="text-[10px] text-slate-500">Previsto x realizado</div></div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"><div className="text-[10px] uppercase text-slate-500">Situação</div><div className={`text-lg font-bold ${classeStatusTexto(prazoStatus)}`}>{prazoStatus}</div><div className="text-[10px] text-slate-500">Previsto x realizado</div></div>
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"><div className="text-[10px] uppercase text-slate-500">Serviços</div><div className="text-lg font-bold text-slate-900">{cronograma.length}</div><div className="text-[10px] text-slate-500">Atividades</div></div>
         </div>
 
@@ -2817,6 +2849,7 @@ function GraficoCronograma({
       <div className="grid grid-cols-[300px_minmax(0,1fr)]">
         <div className="z-20 bg-white shadow-[8px_0_10px_-10px_rgba(15,23,42,0.45)]">
           <div className="h-7 border-b border-slate-200 bg-white" />
+          <div className="flex h-8 items-center border border-slate-200 bg-amber-50 px-3 text-left text-xs font-bold text-amber-800">% previsto da obra</div>
           <div className="flex h-10 items-center border border-slate-300 bg-slate-950 px-3 text-left text-sm font-bold text-white">Serviço</div>
           <div className="flex h-8 items-center border border-slate-200 bg-cyan-50 px-3 text-left text-xs font-semibold text-slate-600">Dia da obra</div>
 
@@ -2848,6 +2881,35 @@ function GraficoCronograma({
             className="overflow-x-auto overflow-y-visible bg-white"
           >
             <div style={{ width: `${larguraDias}px` }}>
+              <div className="grid h-8" style={{ gridTemplateColumns: `repeat(${dias.length}, 38px)` }}>
+                {dias.map((dia) => {
+                  const dataDia = dia.data;
+                  const previstoObraDia = pesoTotalCronograma > 0
+                    ? soma(cronograma.map((item) => {
+                        const peso = Math.max(Number(item.diasPrevistos || 1), 1);
+                        const inicioServico = dataMeioDia(item.inicioPrevisto);
+                        const fimServico = dataMeioDia(item.fimPrevisto);
+
+                        if (dataDia < inicioServico) return 0;
+                        if (dataDia > fimServico) return 100 * peso;
+
+                        const diasUteisAteDia = contarDiasUteisInclusivo(inicioServico, dataDia);
+                        return Math.min((diasUteisAteDia / item.diasPrevistos) * 100, 100) * peso;
+                      })) / pesoTotalCronograma
+                    : 0;
+
+                  return (
+                    <div
+                      key={dia.indice}
+                      className="flex items-center justify-center border border-amber-200 bg-amber-50 px-1 text-center text-[9px] font-bold text-amber-800"
+                      title={`${dataBR(paraISO(dia.data))} • previsto acumulado da obra: ${percentual(previstoObraDia)}`}
+                    >
+                      {percentual(previstoObraDia)}
+                    </div>
+                  );
+                })}
+              </div>
+
               <div className="grid h-10" style={{ gridTemplateColumns: `repeat(${dias.length}, 38px)` }}>
                 {dias.map((dia) => {
                   const fimSemana = ehFimDeSemana(dia.data);
@@ -3104,13 +3166,7 @@ function ResumoServicosCronograma({
             </div>
 
             <div className="md:text-right">
-              <span className={`rounded-full px-3 py-1 text-xs font-bold ${
-                item.situacao === "Atrasado"
-                  ? "bg-red-50 text-red-700"
-                  : item.situacao === "Adiantado"
-                    ? "bg-emerald-50 text-emerald-700"
-                    : "bg-slate-100 text-slate-700"
-              }`}>
+              <span className={`rounded-full px-3 py-1 text-xs font-bold ${classeStatusBadge(item.situacao)}`}>
                 {item.situacao}
               </span>
             </div>
